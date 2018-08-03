@@ -52,7 +52,8 @@ download the refined dataset from original post: (emore recommended)
     python prepare_data.py
     ```
 after the execution, you should find following structure:
-- faces_emore/
+```
+faces_emore/
             ---> agedb_30
             ---> calfw
             ---> cfp_ff
@@ -62,6 +63,7 @@ after the execution, you should find following structure:
             --->imgs
             ---> lfw
             ---> vgg2_fp
+```
 - - -
 ### detect over camera:
 
