@@ -11,9 +11,9 @@ Pytorch0.4 codes for InsightFace
 ## 2. Pretrained Models & Performance
 [MobileFaceNet@BaiduDrive](Coming Soon), [@GoogleDrive](Coming Soon) (coming soon)
 
-|  LFW(%)     | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | MegaFace(%)   |
-|  ------     | --------- | --------- | ----------- | ------------- |
-|   ?      | ?     | ?     | ?       | ?        |
+| Method  | LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) |
+| ------- | ------ | --------- | --------- | ----------- |  
+|  Ours   | ?  |  ?    |   ?   |   ?     | 
 
 [LResNet50E-IR@BaiduDrive](Coming Soon), [@GoogleDrive](Coming Soon) (coming soon)
 
