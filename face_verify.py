@@ -15,6 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('-th','--threshold',help='threshold to decide identical faces',default=1.54, type=float)
     parser.add_argument("-u", "--update", help="whether perform update the facebank",action="store_true")
     parser.add_argument("-tta", "--tta", help="whether test time augmentation",action="store_true")
+    parser.add_argument("-c", "--score", help="whether show the confidence score",action="store_true")
     args = parser.parse_args()
 
     conf = get_config(False)
@@ -54,9 +55,12 @@ if __name__ == '__main__':
                 bboxes = bboxes[:,:-1] #shape:[10,4],only keep 10 highest possibiity faces
                 bboxes = bboxes.astype(int)
                 bboxes = bboxes + [-1,-1,1,1] # personal choice    
-                results = learner.infer(conf, faces, targets, args.tta)
+                results, score = learner.infer(conf, faces, targets, args.tta)
                 for idx,bbox in enumerate(bboxes):
-                    frame = draw_box_name(bbox, names[results[idx] + 1], frame)
+                    if args.score:
+                        frame = draw_box_name(bbox, names[results[idx] + 1] + '_{:.2f}'.format(score[idx]), frame)
+                    else:
+                        frame = draw_box_name(bbox, names[results[idx] + 1], frame)
             except:
                 print('detect error')    
                 

@@ -10,6 +10,7 @@ import bcolz
 import pickle
 import torch
 import mxnet as mx
+from tqdm import tqdm
 
 def de_preprocess(tensor):
     return tensor*0.5 + 0.5
@@ -20,20 +21,16 @@ def get_train_dataset(imgs_folder):
         trans.ToTensor(),
         trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ])
-    test_transform = trans.Compose([
-        trans.ToTensor(),
-        trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-    ])
     ds = ImageFolder(imgs_folder, train_transform)
     class_num = ds[-1][1] + 1
-    return ds, class_num, test_transform
+    return ds, class_num
 
 def get_train_loader(conf):
-    if conf.data_mode == 'ms1m' or 'concat':
-        ms1m_ds, ms1m_class_num, _ = get_train_dataset(conf.ms1m_folder)
+    if conf.data_mode in ['ms1m', 'concat']:
+        ms1m_ds, ms1m_class_num = get_train_dataset(conf.ms1m_folder/'imgs')
         print('ms1m loader generated')
-    if conf.data_mode == 'vgg' or 'concat':
-        vgg_ds, vgg_class_num, test_transform = get_train_dataset(conf.vgg_folder)
+    if conf.data_mode in ['vgg', 'concat']:
+        vgg_ds, vgg_class_num = get_train_dataset(conf.vgg_folder/'imgs')
         print('vgg loader generated')        
     if conf.data_mode == 'vgg':
         ds = vgg_ds
@@ -45,11 +42,15 @@ def get_train_loader(conf):
         for i,(url,label) in enumerate(vgg_ds.imgs):
             vgg_ds.imgs[i] = (url, label + ms1m_class_num)
         ds = ConcatDataset([ms1m_ds,vgg_ds])
-        class_num = vgg_class_num + ms1m_class_num             
+        class_num = vgg_class_num + ms1m_class_num
+    elif conf.data_mode == 'emore':
+        ds, class_num = get_train_dataset(conf.emore_folder/'imgs')
     loader = DataLoader(ds, batch_size=conf.batch_size, shuffle=True, pin_memory=conf.pin_memory, num_workers=conf.num_workers)
-    return loader, class_num, test_transform 
+    return loader, class_num 
     
 def load_bin(path, rootdir, transform, image_size=[112,112]):
+    if not rootdir.exists():
+        rootdir.mkdir()
     bins, issame_list = pickle.load(open(path, 'rb'), encoding='bytes')
     data = bcolz.fill([len(bins), 3, image_size[0], image_size[1]], dtype=np.float32, rootdir=rootdir, mode='w')
     for i in range(len(bins)):
@@ -73,6 +74,24 @@ def get_val_data(data_path):
     lfw = bcolz.carray(rootdir = data_path/'lfw', mode='r')
     lfw_issame = np.load(data_path/'lfw_list.npy')
     return agedb_30, cfp_fp, lfw, agedb_30_issame, cfp_fp_issame, lfw_issame
+
+def load_mx_rec(rec_path):
+    save_path = rec_path/'imgs'
+    if not save_path.exists():
+        save_path.mkdir()
+    imgrec = mx.recordio.MXIndexedRecordIO(str(rec_path/'train.idx'), str(rec_path/'train.rec'), 'r')
+    img_info = imgrec.read_idx(0)
+    header,_ = mx.recordio.unpack(img_info)
+    max_idx = int(header.label[0])
+    for idx in tqdm(range(1,max_idx)):
+        img_info = imgrec.read_idx(idx)
+        header, img = mx.recordio.unpack_img(img_info)
+        label = int(header.label)
+        img = Image.fromarray(img)
+        label_path = save_path/str(label)
+        if not label_path.exists():
+            label_path.mkdir()
+        img.save(label_path/'{}.jpg'.format(idx), quality=95)
 
 # class train_dataset(Dataset):
 #     def __init__(self, imgs_bcolz, label_bcolz, h_flip=True):
