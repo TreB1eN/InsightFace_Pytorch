@@ -29,14 +29,16 @@ Pytorch0.4 codes for InsightFace
 ### 3.1Data Preparation
 #### 3.1.1 Prepare Facebank (For testing over camera or video)
 Provide the face images your want to detect in the data/face_bank folder, and guarantee it have a structure like following:
-* data/facebank/
- -       ---> id1/
- -           ---> id1_1.jpg
- -       ---> id2/
- -           ---> id2_1.jpg
- -       ---> id3/
- -           ---> id3_1.jpg
- -          ---> id3_2.jpg
+```
+data/facebank/
+        ---> id1/
+            ---> id1_1.jpg
+        ---> id2/
+            ---> id2_1.jpg
+        ---> id3/
+            ---> id3_1.jpg
+           ---> id3_2.jpg
+```
 #### 3.1.2 download the pretrained model to work_space/model
 If more than 1 image appears in one folder, an average embedding will be calculated
 #### 3.2.2 Prepare Dataset ( For training)
