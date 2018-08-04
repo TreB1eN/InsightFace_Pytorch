@@ -102,6 +102,8 @@ faces_emore/
     ```
 the video file should be inside the data/face_bank folder
 
+- Video Detection Demo [@Youtube](https://www.youtube.com/watch?v=6r9RCRmxtHE)
+
 ### Training:
     ```
     python train.py -b [batch_size] -lr [learning rate] -e [epochs]
