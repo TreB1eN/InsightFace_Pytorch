@@ -112,7 +112,7 @@ the video file should be inside the data/face_bank folder
     python train.py -b [batch_size] -lr [learning rate] -e [epochs]
     ```
 ## 4. References 
-* This repo is mainly inspired by [deepinsight/insightface] and [InsightFace_TF]
+* This repo is mainly inspired by [deepinsight/insightface](https://github.com/deepinsight/insightface) and [InsightFace_TF](https://github.com/auroua/InsightFace_TF)
 
 ## PS
 * PRs are welcome, in case that I don't have the resource to train some large models like the 100 and 151 layers model
