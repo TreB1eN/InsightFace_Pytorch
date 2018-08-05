@@ -11,15 +11,15 @@ Pytorch0.4 codes for InsightFace
 ## 2. Pretrained Models & Performance
 [MobileFaceNet@BaiduDrive](Coming Soon), [@GoogleDrive](Coming Soon) (coming soon)
 
-|  LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) |
-|  ------ | --------- | --------- | ----------- |  
-|   ?  |  ?    |   ?   |   ?     | 
+|  LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | calfw(%) | cplfw(%) |  vgg2_fp(%)   |
+|  ------     | --------- | --------- | ----------- | ------------- | ------------- | ------------- |
+|   0.9952      | 0.9962     | 0.9504     | 0.9622      |    0.9557     |    0.9107     |    0.9386        |
 
 [LResNet50E-IR@BaiduDrive](Coming Soon), [@GoogleDrive](Coming Soon) (coming soon)
 
-|  LFW(%)     | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | MegaFace(%)   |
-|  ------     | --------- | --------- | ----------- | ------------- |
-|   ?      | ?     | ?     | ?       | ?        |
+|  LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | calfw(%) | cplfw(%) |  vgg2_fp(%)   |
+|  ------     | --------- | --------- | ----------- | ------------- | ------------- | ------------- |
+|   ?      | ?     | ?     | ?      |    ?     |    ?     |    ?        |
 
 ## 3.How to use
 * clone
@@ -101,6 +101,8 @@ faces_emore/
     python infer_on_video.py -f [video file name] -s [save file name]
     ```
 the video file should be inside the data/face_bank folder
+
+- Video Detection Demo [@Youtube](https://www.youtube.com/watch?v=6r9RCRmxtHE)
 
 ### Training:
     ```
