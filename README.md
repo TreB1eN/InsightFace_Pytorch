@@ -17,9 +17,9 @@ Pytorch0.4 codes for InsightFace
 
 [LResNet50E-IR@BaiduDrive](Coming Soon), [@GoogleDrive](Coming Soon) (coming soon)
 
-|  LFW(%)     | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | MegaFace(%)   |
-|  ------     | --------- | --------- | ----------- | ------------- |
-|   ?      | ?     | ?     |  ?       | ?        |
+|  LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | calfw(%) | cplfw(%) |  vgg2_fp(%)   |
+|  ------     | --------- | --------- | ----------- | ------------- | ------------- | ------------- |
+|   ?      | ?     | ?     | ?      |    ?     |    ?     |    ?        |
 
 ## 3.How to use
 * clone
