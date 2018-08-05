@@ -2,7 +2,7 @@
 Pytorch0.4 codes for InsightFace
 
 - - -
-## 1.Intro
+## 1. Intro
 * This repo is a reimplementation of Arcface[(paper)](https://arxiv.org/abs/1801.07698), or Insightface[(github)](https://github.com/deepinsight/insightface)
 * For models, including the pytorch implementation of the backbone modules of Arcface and MobileFacenet
 * Codes for transform MXNET data records in Insightface[(github)](https://github.com/deepinsight/insightface) to Image Datafolders are provided
@@ -21,12 +21,12 @@ Pytorch0.4 codes for InsightFace
 |  ------     | --------- | --------- | ----------- | ------------- | ------------- | ------------- |
 |   ?      | ?     | ?     | ?      |    ?     |    ?     |    ?        |
 
-## 3.How to use
+## 3. How to use
 * clone
     ```
     git clone https://github.com/TropComplique/mtcnn-pytorch.git
     ```
-### 3.1Data Preparation
+### 3.1 Data Preparation
 #### 3.1.1 Prepare Facebank (For testing over camera or video)
 Provide the face images your want to detect in the data/face_bank folder, and guarantee it have a structure like following:
 ```
@@ -41,7 +41,7 @@ data/facebank/
 ```
 #### 3.1.2 download the pretrained model to work_space/model
 If more than 1 image appears in one folder, an average embedding will be calculated
-#### 3.2.2 Prepare Dataset ( For training)
+#### 3.2.3 Prepare Dataset ( For training)
 download the refined dataset from original post: (emore recommended)
 * [Refined-MS1M@BaiduDrive](https://pan.baidu.com/s/1nxmSCch), [Refined-MS1M@GoogleDrive](https://drive.google.com/file/d/1XRdCt3xOw7B3saw0xUSzLRub_HI4Jbk3/view)
 * [VGGFace2@BaiduDrive](https://pan.baidu.com/s/1c3KeLzy), [VGGFace2@GoogleDrive](https://drive.google.com/open?id=1KORwx_DWyIScAjD6vbo4CSRu048APoum)
@@ -67,7 +67,7 @@ faces_emore/
             ---> vgg2_fp
 ```
 - - -
-### detect over camera:
+### 3.2 detect over camera:
 
 * 2 download the desired weights [Mobilefacenet] , [IR-SE50]to model folder
 - [Mobilefacenet @ BaiduDrive(coming soon)](https://pan.baidu.com/s/1c3KeLzy)
@@ -99,7 +99,7 @@ faces_emore/
     python face_verify.py 
     ```
 - - -
-### detect over video:
+### 3.3 detect over video:
     ```
     python infer_on_video.py -f [video file name] -s [save file name]
     ```
@@ -107,11 +107,11 @@ the video file should be inside the data/face_bank folder
 
 - Video Detection Demo [@Youtube](https://www.youtube.com/watch?v=6r9RCRmxtHE)
 
-### Training:
+### 3.4 Training:
     ```
     python train.py -b [batch_size] -lr [learning rate] -e [epochs]
     ```
-## References 
+## 4. References 
 * This repo is mainly inspired by [deepinsight/insightface] and [InsightFace_TF]
 
 ## PS
