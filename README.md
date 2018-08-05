@@ -114,6 +114,6 @@ the video file should be inside the data/face_bank folder
 ## References 
 * This repo is mainly inspired by [deepinsight/insightface] and [InsightFace_TF]
 
-#### PS
+## PS
 * PRs are welcome, in case that I don't have the resource to train some large models like the 100 and 151 layers model
 * Email : treb1en@qq.com
