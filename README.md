@@ -47,6 +47,8 @@ download the refined dataset from original post: (emore recommended)
 * [VGGFace2@BaiduDrive](https://pan.baidu.com/s/1c3KeLzy), [VGGFace2@GoogleDrive](https://drive.google.com/open?id=1KORwx_DWyIScAjD6vbo4CSRu048APoum)
 * [emore dataset @ BaiduDrive](https://pan.baidu.com/s/1c3KeLzy), [emore dataset @ OneDrive](https://pan.baidu.com/s/1c3KeLzy)
 
+**Note:** If you use the refined [MS1M](https://arxiv.org/abs/1607.08221) dataset and the cropped [VGG2](https://arxiv.org/abs/1710.08092) dataset, please cite the original papers.
+
 * after unzip the files to 'data' path, run :
     ```
     python prepare_data.py
@@ -109,3 +111,9 @@ the video file should be inside the data/face_bank folder
     ```
     python train.py -b [batch_size] -lr [learning rate] -e [epochs]
     ```
+## References 
+* This repo is mainly inspired by [deepinsight/insightface] and [InsightFace_TF]
+
+#### PS
+* PRs are welcome, in case that I don't have the resource to train some large models like the 100 and 151 layers model
+* Email : treb1en@qq.com
