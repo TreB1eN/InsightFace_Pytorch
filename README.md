@@ -68,8 +68,9 @@ faces_emore/
 ### detect over camera:
 
 * 2 download the desired weights [Mobilefacenet] , [IR-SE50]to model folder
-[Mobilefacenet]:https://pan.baidu.com/s/1PwHjtGLAmAoG5LJkQk5LSQ
-[IR-SE50]:https://pan.baidu.com/s/1PwHjtGLAmAoG5LJkQk5LSQ
+[Mobilefacenet @ BaiduDrive](https://pan.baidu.com/s/1c3KeLzy)
+[IR-SE50 @ BaiduDrive](https://pan.baidu.com/s/1c3KeLzy)
+
 
 * 3 to take a picture, run
     ```
