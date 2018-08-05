@@ -66,13 +66,15 @@ def load_bin(path, rootdir, transform, image_size=[112,112]):
     np.save(str(rootdir)+'_list', np.array(issame_list))
     return data, issame_list
 
+def get_val_pair(path, name):
+    carray = bcolz.carray(rootdir = path/name, mode='r')
+    issame = np.load(path/'{}_list.npy'.format(name))
+    return carray, issame
+
 def get_val_data(data_path):
-    agedb_30 = bcolz.carray(rootdir = data_path/'agedb_30', mode='r')
-    agedb_30_issame = np.load(data_path/'agedb_30_list.npy')
-    cfp_fp = bcolz.carray(rootdir = data_path/'cfp_fp', mode='r')
-    cfp_fp_issame = np.load(data_path/'cfp_fp_list.npy')
-    lfw = bcolz.carray(rootdir = data_path/'lfw', mode='r')
-    lfw_issame = np.load(data_path/'lfw_list.npy')
+    agedb_30, agedb_30_issame = get_val_pair(data_path, 'agedb_30')
+    cfp_fp, cfp_fp_issame = get_val_pair(data_path, 'cfp_fp')
+    lfw, lfw_issame = get_val_pair(data_path, 'lfw')
     return agedb_30, cfp_fp, lfw, agedb_30_issame, cfp_fp_issame, lfw_issame
 
 def load_mx_rec(rec_path):
