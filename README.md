@@ -69,19 +69,13 @@ faces_emore/
 - - -
 ### 3.2 detect over camera:
 
-* 2 download the desired weights [Mobilefacenet] , [IR-SE50]to model folder
-- [Mobilefacenet @ BaiduDrive(coming soon)](https://pan.baidu.com/s/1c3KeLzy)
-- [IR-SE50 @ BaiduDrive](https://pan.baidu.com/s/1e-lUdtS-k69khDx09QN2Mg)
-- [IR-SE50 @ OneDrive](https://1drv.ms/u/s!AhMqVPD44cDOhkPsOU2S_HFpY9dC)
-
-
-* 3 to take a picture, run
+* 1 to take a picture, run
     ```
     python take_pic.py -n name
     ```
     press q to take a picture, it will only capture 1 highest possibility face if more than 1 person appear in the camera
 
-* 4 or you can put any preexisting photo into the facebank directory, the file structure is following:
+* 2 or you can put any preexisting photo into the facebank directory, the file structure is following:
     
 - facebank/
          name1/
@@ -95,7 +89,7 @@ faces_emore/
          .....
     if more than 1 image appears in the directory, average embedding will be calculated
 
-- 5 to start
+- 3 to start
     ```
     python face_verify.py 
     ```
