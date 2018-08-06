@@ -190,6 +190,7 @@ class face_learner(object):
         self.model.train()
         running_loss = 0.
         for e in range(epochs):
+            print('epoch {} started'.format(e))
             for imgs, labels in tqdm(iter(self.loader)):
                 imgs = imgs.to(conf.device)
                 labels = labels.to(conf.device)

@@ -6,12 +6,16 @@ from mtcnn_pytorch.src.get_nets import PNet, RNet, ONet
 from mtcnn_pytorch.src.box_utils import nms, calibrate_box, get_image_boxes, convert_to_square
 from mtcnn_pytorch.src.first_stage import run_first_stage
 from mtcnn_pytorch.src.align_trans import get_reference_facial_points, warp_and_crop_face
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = 'cpu'
 
 class MTCNN():
     def __init__(self):
-        self.pnet = PNet()
-        self.rnet = RNet()
-        self.onet = ONet()
+        self.pnet = PNet().to(device)
+        self.rnet = RNet().to(device)
+        self.onet = ONet().to(device)
+        self.onet.eval()
+        self.rnet.eval()
         self.onet.eval()
         self.refrence = get_reference_facial_points(default_square= True)
         
@@ -98,11 +102,11 @@ class MTCNN():
             # STAGE 2
 
             img_boxes = get_image_boxes(bounding_boxes, image, size=24)
-            img_boxes = torch.FloatTensor(img_boxes)
+            img_boxes = torch.FloatTensor(img_boxes).to(device)
 
             output = self.rnet(img_boxes)
-            offsets = output[0].data.numpy()  # shape [n_boxes, 4]
-            probs = output[1].data.numpy()  # shape [n_boxes, 2]
+            offsets = output[0].cpu().data.numpy()  # shape [n_boxes, 4]
+            probs = output[1].cpu().data.numpy()  # shape [n_boxes, 2]
 
             keep = np.where(probs[:, 1] > thresholds[1])[0]
             bounding_boxes = bounding_boxes[keep]
@@ -120,11 +124,11 @@ class MTCNN():
             img_boxes = get_image_boxes(bounding_boxes, image, size=48)
             if len(img_boxes) == 0: 
                 return [], []
-            img_boxes = torch.FloatTensor(img_boxes)
+            img_boxes = torch.FloatTensor(img_boxes).to(device)
             output = self.onet(img_boxes)
-            landmarks = output[0].data.numpy()  # shape [n_boxes, 10]
-            offsets = output[1].data.numpy()  # shape [n_boxes, 4]
-            probs = output[2].data.numpy()  # shape [n_boxes, 2]
+            landmarks = output[0].cpu().data.numpy()  # shape [n_boxes, 10]
+            offsets = output[1].cpu().data.numpy()  # shape [n_boxes, 4]
+            probs = output[2].cpu().data.numpy()  # shape [n_boxes, 2]
 
             keep = np.where(probs[:, 1] > thresholds[2])[0]
             bounding_boxes = bounding_boxes[keep]
