@@ -72,7 +72,7 @@ faces_emore/
 * 1. download the desired weights to model folder:
 - [IR-SE50 @ BaiduNetdisk](https://pan.baidu.com/s/12BUjjwy1uUTEF9HCx5qvoQ)
 - [IR-SE50 @ Onedrive](https://1drv.ms/u/s!AhMqVPD44cDOhkPsOU2S_HFpY9dC)
-- [Mobilefacenet @ BaiduNetDisk (comming soon)]()
+- [Mobilefacenet @ BaiduNetDisk](https://pan.baidu.com/s/1hqNNkcAjQOSxUjofboN6qg)
 - [Mobilefacenet @ OneDrive (comming soon)]()
 
 * 2 to take a picture, run
