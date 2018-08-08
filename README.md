@@ -81,8 +81,8 @@ faces_emore/
     ```
     press q to take a picture, it will only capture 1 highest possibility face if more than 1 person appear in the camera
 
-* 3 or you can put any preexisting photo into the facebank directory, the file structure is following:
-    
+* 3 or you can put any preexisting photo into the facebank directory, the file structure is as following:
+```    
 - facebank/
          name1/
              photo1.jpg
@@ -94,6 +94,7 @@ faces_emore/
              ...
          .....
     if more than 1 image appears in the directory, average embedding will be calculated
+```
 
 - 4 to start
     ```
