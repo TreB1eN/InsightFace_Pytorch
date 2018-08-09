@@ -9,17 +9,17 @@ Pytorch0.4 codes for InsightFace
 * Pretrained models are posted, include the [MobileFacenet](https://arxiv.org/abs/1804.07573) and IR-SE50 in the original paper
 - - -
 ## 2. Pretrained Models & Performance
-[MobileFaceNet@BaiduDrive](Coming Soon), [@GoogleDrive](Coming Soon) (coming soon)
+[IR-SE50 @ BaiduNetdisk](https://pan.baidu.com/s/12BUjjwy1uUTEF9HCx5qvoQ), [IR-SE50 @ Onedrive](https://1drv.ms/u/s!AhMqVPD44cDOhkPsOU2S_HFpY9dC)
 
 |  LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | calfw(%) | cplfw(%) |  vgg2_fp(%)   |
 |  ------     | --------- | --------- | ----------- | ------------- | ------------- | ------------- |
 |   0.9952      | 0.9962     | 0.9504     | 0.9622      |    0.9557     |    0.9107     |    0.9386        |
 
-[LResNet50E-IR@BaiduDrive](Coming Soon), [@GoogleDrive](Coming Soon) (coming soon)
+[Mobilefacenet @ BaiduNetDisk](https://pan.baidu.com/s/1hqNNkcAjQOSxUjofboN6qg), [Mobilefacenet @ OneDrive](https://1drv.ms/u/s!AhMqVPD44cDOhkSMHodSH4rhfb5u)
 
 |  LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | calfw(%) | cplfw(%) |  vgg2_fp(%)   |
 |  ------     | --------- | --------- | ----------- | ------------- | ------------- | ------------- |
-|   ?      | ?     | ?     | ?      |    ?     |    ?     |    ?        |
+|   0.9918      |   0.9891     |   0.8986   |   0.9347    |    0.9402     |    0.866     |    0.9100        |
 
 ## 3. How to use
 * clone
@@ -72,8 +72,8 @@ faces_emore/
 * 1. download the desired weights to model folder:
 - [IR-SE50 @ BaiduNetdisk](https://pan.baidu.com/s/12BUjjwy1uUTEF9HCx5qvoQ)
 - [IR-SE50 @ Onedrive](https://1drv.ms/u/s!AhMqVPD44cDOhkPsOU2S_HFpY9dC)
-- [Mobilefacenet @ BaiduNetDisk (comming soon)]()
-- [Mobilefacenet @ OneDrive (comming soon)]()
+- [Mobilefacenet @ BaiduNetDisk](https://pan.baidu.com/s/1hqNNkcAjQOSxUjofboN6qg)
+- [Mobilefacenet @ OneDrive](https://1drv.ms/u/s!AhMqVPD44cDOhkSMHodSH4rhfb5u)
 
 * 2 to take a picture, run
     ```
@@ -81,8 +81,8 @@ faces_emore/
     ```
     press q to take a picture, it will only capture 1 highest possibility face if more than 1 person appear in the camera
 
-* 3 or you can put any preexisting photo into the facebank directory, the file structure is following:
-    
+* 3 or you can put any preexisting photo into the facebank directory, the file structure is as following:
+```    
 - facebank/
          name1/
              photo1.jpg
@@ -94,6 +94,7 @@ faces_emore/
              ...
          .....
     if more than 1 image appears in the directory, average embedding will be calculated
+```
 
 - 4 to start
     ```
