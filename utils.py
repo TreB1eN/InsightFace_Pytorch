@@ -11,6 +11,23 @@ from model import l2_norm
 import pdb
 import cv2
 
+def separate_bn_paras(modules):
+    if not isinstance(modules, list):
+        modules = [*module.modules()]
+    paras_only_bn = []
+    paras_wo_bn = []
+    for layer in modules:
+        if 'model' in str(layer.__class__):
+            continue
+        if 'container' in str(layer.__class__):
+            continue
+        else:
+            if 'batchnorm' in str(layer.__class__):
+                paras_only_bn.extend([*layer.parameters()])
+            else:
+                paras_wo_bn.extend([*layer.parameters()])
+    return paras_only_bn, paras_wo_bn
+
 def prepare_facebank(conf, model, mtcnn, tta = True):
     model.eval()
     embeddings =  []

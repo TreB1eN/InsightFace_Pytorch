@@ -8,7 +8,7 @@ from tqdm import tqdm
 from tensorboardX import SummaryWriter
 from matplotlib import pyplot as plt
 plt.switch_backend('agg')
-from utils import get_time, gen_plot, hflip_batch
+from utils import get_time, gen_plot, hflip_batch, separate_bn_paras
 from PIL import Image
 from torchvision import transforms as trans
 import math
@@ -34,13 +34,8 @@ class face_learner(object):
 
             print('two model heads generated')
 
-            paras_only_bn = []
-            paras_wo_bn = []
-            for para in self.model.named_parameters():
-                if 'bn' in para[0]:
-                    paras_only_bn.append(para[1])
-                else:
-                    paras_wo_bn.append(para[1])
+            paras_only_bn, paras_wo_bn = separate_bn_paras(self.model)
+            
             if conf.use_mobilfacenet:
                 self.optimizer = optim.SGD([
                                     {'params': paras_wo_bn[:-1], 'weight_decay': 4e-5},
