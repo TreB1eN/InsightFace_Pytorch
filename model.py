@@ -265,12 +265,12 @@ class Arcface(Module):
         sin_theta_2 = 1 - cos_theta_2
         sin_theta = torch.sqrt(sin_theta_2)
         cos_theta_m = (cos_theta * self.cos_m - sin_theta * self.sin_m)
-        # this condition controls the theta+m should in range [threshold, pi]
+        # this condition controls the theta+m should in range [0, pi]
         #      0<=theta+m<=pi
         #     -m<=theta<=pi-m
         cond_v = cos_theta - self.threshold
-        cond_mask = cond_v > 0
-        keep_val = (cos_theta - self.mm) # when theta not in [threshold,pi], use cosface instead
+        cond_mask = cond_v <= 0
+        keep_val = (cos_theta - self.mm) # when theta not in [0,pi], use cosface instead
         cos_theta_m[cond_mask] = keep_val[cond_mask]        
         label = label.view(-1,1) #size=(B,1) 
         output = cos_theta * 1.0 # a little bit hacky way to prevent in_place operation on cos_theta
