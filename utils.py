@@ -13,7 +13,7 @@ import cv2
 
 def separate_bn_paras(modules):
     if not isinstance(modules, list):
-        modules = [*module.modules()]
+        modules = [*modules.modules()]
     paras_only_bn = []
     paras_wo_bn = []
     for layer in modules:

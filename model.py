@@ -269,12 +269,13 @@ class Arcface(Module):
         #      0<=theta+m<=pi
         #     -m<=theta<=pi-m
         cond_v = cos_theta - self.threshold
-        cond_mask = cond_v > 0
+        cond_mask = cond_v <= 0
         keep_val = (cos_theta - self.mm) # when theta not in [0,pi], use cosface instead
         cos_theta_m[cond_mask] = keep_val[cond_mask]        
         label = label.view(-1,1) #size=(B,1) 
         output = cos_theta * 1.0 # a little bit hacky way to prevent in_place operation on cos_theta
-        output[torch.range(0,nB-1).to(torch.long),label] = cos_theta_m[torch.range(0,nB-1).to(torch.long),label]
+        idx_ = torch.arange(0, nB, dtype=torch.long)
+        output[idx_, label] = cos_theta_m[idx_, label]
         output *= self.s # scale up in order to make softmax work, first introduced in normface
         return output
 

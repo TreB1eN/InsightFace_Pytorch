@@ -25,7 +25,7 @@ class face_learner(object):
             print('{}_{} model generated'.format(conf.net_mode, conf.net_depth))
         
         if not inference:
-#             self.milestones = conf.milestones
+            self.milestones = conf.milestones
             self.loader, self.class_num = get_train_loader(conf)        
 
             self.writer = SummaryWriter(conf.log_path)
@@ -48,7 +48,7 @@ class face_learner(object):
                                     {'params': paras_only_bn}
                                 ], lr = conf.lr, momentum = conf.momentum)
             print(self.optimizer)
-            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=40, verbose=True)
+#             self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=40, verbose=True)
 
             print('optimizers generated')    
             self.board_loss_every = len(self.loader)//100
@@ -183,9 +183,15 @@ class face_learner(object):
 
     def train(self, conf, epochs):
         self.model.train()
-        running_loss = 0.
+        running_loss = 0.            
         for e in range(epochs):
             print('epoch {} started'.format(e))
+            if e == self.milestones[0]:
+                self.schedule_lr()
+            if e == self.milestones[1]:
+                self.schedule_lr()      
+            if e == self.milestones[2]:
+                self.schedule_lr()                                 
             for imgs, labels in tqdm(iter(self.loader)):
                 imgs = imgs.to(conf.device)
                 labels = labels.to(conf.device)
@@ -200,7 +206,6 @@ class face_learner(object):
                 if self.step % self.board_loss_every == 0 and self.step != 0:
                     loss_board = running_loss / self.board_loss_every
                     self.writer.add_scalar('train_loss', loss_board, self.step)
-                    self.scheduler.step(loss_board)
                     running_loss = 0.
                 
                 if self.step % self.evaluate_every == 0 and self.step != 0:
@@ -215,18 +220,6 @@ class face_learner(object):
                     self.save_state(conf, accuracy)
                     
                 self.step += 1
-                
-#             if e == self.milestones[0]:
-#                 self.schedule_lr()               
-#                 self.save_state(conf, accuracy, to_save_folder=True, extra='{} epochs'.format(e))
-                
-#             if e == self.milestones[1]:
-#                 self.schedule_lr()               
-#                 self.save_state(conf, accuracy, to_save_folder=True, extra='{} epochs'.format(e))
-                
-#             if e == self.milestones[2]:
-#                 self.schedule_lr()                                 
-#                 self.save_state(conf, accuracy, to_save_folder=True, extra='{} epochs'.format(e))
                 
         self.save_state(conf, accuracy, to_save_folder=True, extra='final')
 

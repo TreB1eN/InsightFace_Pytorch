@@ -2,9 +2,11 @@ from config import get_config
 from Learner import face_learner
 import argparse
 
+# python train.py -net mobilefacenet -b 200 -w 4 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='for face verification')
-    parser.add_argument("-e", "--epochs", help="training epochs", default=8, type=int)
+    parser.add_argument("-e", "--epochs", help="training epochs", default=18, type=int)
     parser.add_argument("-net", "--net_mode", help="which network, [ir, ir_se, mobilefacenet]",default='ir_se', type=str)
     parser.add_argument("-depth", "--net_depth", help="how many layers [50,100,152]", default=50, type=int)
     parser.add_argument('-lr','--lr',help='learning rate',default=1e-3, type=float)
