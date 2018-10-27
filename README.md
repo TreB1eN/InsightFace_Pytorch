@@ -112,7 +112,10 @@ the video file should be inside the data/face_bank folder
 ### 3.4 Training:
     ```
     python train.py -b [batch_size] -lr [learning rate] -e [epochs]
+    
+    # python train.py -net mobilefacenet -b 200 -w 4
     ```
+    
 ## 4. References 
 * This repo is mainly inspired by [deepinsight/insightface](https://github.com/deepinsight/insightface) and [InsightFace_TF](https://github.com/auroua/InsightFace_TF)
 
