@@ -47,13 +47,14 @@ def prepare_facebank(conf, model, mtcnn, tta = True):
                         continue
                     if img.size != (112, 112):
                         img = mtcnn.align(img)
-                    if tta:
-                        mirror = trans.functional.hflip(img)
-                        emb = model(conf.test_transform(img).to(conf.device).unsqueeze(0))
-                        emb_mirror = model(conf.test_transform(mirror).to(conf.device).unsqueeze(0))
-                        embs.append(l2_norm(emb + emb_mirror))
-                    else:                        
-                        embs.append(model(conf.test_transform(img).to(conf.device).unsqueeze(0)))
+                    with torch.no_grad():
+                        if tta:
+                            mirror = trans.functional.hflip(img)
+                            emb = model(conf.test_transform(img).to(conf.device).unsqueeze(0))
+                            emb_mirror = model(conf.test_transform(mirror).to(conf.device).unsqueeze(0))
+                            embs.append(l2_norm(emb + emb_mirror))
+                        else:                        
+                            embs.append(model(conf.test_transform(img).to(conf.device).unsqueeze(0)))
         if len(embs) == 0:
             continue
         embedding = torch.cat(embs).mean(0,keepdim=True)

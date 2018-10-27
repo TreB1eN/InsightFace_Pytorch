@@ -2,7 +2,7 @@ from config import get_config
 from Learner import face_learner
 import argparse
 
-# python train.py -net mobilefacenet -b 200 -w 4 
+# python train.py -net mobilefacenet -b 200 -w 4
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='for face verification')
