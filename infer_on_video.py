@@ -56,7 +56,8 @@ if __name__ == '__main__':
     while cap.isOpened():
         isSuccess,frame = cap.read()
         if isSuccess:            
-            image = Image.fromarray(frame[...,::-1]) #bgr to rgb
+#             image = Image.fromarray(frame[...,::-1]) #bgr to rgb
+            image = Image.fromarray(frame)
             try:
                 bboxes, faces = mtcnn.align_multi(image, conf.face_limit, 16)
             except:
