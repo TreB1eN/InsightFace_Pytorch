@@ -200,7 +200,7 @@ class face_learner(object):
                 thetas = self.head(embeddings, labels)
                 loss = conf.ce_loss(thetas, labels)
                 loss.backward()
-                running_loss += loss.item()/conf.batch_size
+                running_loss += loss.item()
                 self.optimizer.step()
                 
                 if self.step % self.board_loss_every == 0 and self.step != 0:
