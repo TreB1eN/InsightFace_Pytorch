@@ -48,7 +48,7 @@ def calculate_roc_attention(thresholds,
     # print('pca', pca)
 
     if pca == 0:
-        dist = xCoses
+        cosines = xCoses
 
     for fold_idx, (train_set, test_set) in enumerate(k_fold.split(indices)):
         # print('train_set', train_set)
@@ -61,7 +61,7 @@ def calculate_roc_attention(thresholds,
         for threshold_idx, threshold in enumerate(thresholds):
             _, _, acc_train[threshold_idx] = calculate_accuracy(
                     threshold,
-                    dist[train_set],
+                    cosines[train_set],
                     actual_issame[train_set],
                    useCos=True)
         best_threshold_index = np.argmax(acc_train)
@@ -69,12 +69,12 @@ def calculate_roc_attention(thresholds,
         for threshold_idx, threshold in enumerate(thresholds):
             tprs[fold_idx, threshold_idx], fprs[fold_idx, threshold_idx], _ = \
                     calculate_accuracy(threshold,
-                                       dist[test_set],
+                                       cosines[test_set],
                                        actual_issame[test_set],
                                        useCos=True)
         _, _, accuracy[fold_idx] = calculate_accuracy(
                 thresholds[best_threshold_index],
-                dist[test_set],
+                cosines[test_set],
                 actual_issame[test_set],
                 useCos=True)
 
@@ -238,7 +238,7 @@ def evaluate_attention(xCoses, actual_issame, nrof_folds=10, pca=0):
     actual_issame: list (# of pairs,)
     '''
     # Calculate evaluation metrics
-    thresholds = np.arange(0, 4, 0.01)
+    thresholds = np.arange(-1.0, 1.0, 0.005)
     tpr, fpr, accuracy, best_thresholds = calculate_roc_attention(
             thresholds, xCoses,
             np.asarray(actual_issame), nrof_folds=nrof_folds, pca=pca)

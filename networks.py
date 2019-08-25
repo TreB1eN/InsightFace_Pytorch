@@ -37,7 +37,7 @@ class AttentionXCosNet(nn.Module):
 
     def forward(self, feat_grid_1, feat_grid_2):
         '''
-            feat_grid_1.size(): [bs, 512, 7, 7]
+            feat_grid_1.size(): [bs, 32, 7, 7]
             attention_weights.size(): [bs, 1, 7, 7]
         '''
         # XXX Do I need to normalize grid_feat?

@@ -1,5 +1,6 @@
 import os
 import math
+import cv2
 import bcolz
 import torch
 import numpy as np
@@ -10,12 +11,13 @@ from matplotlib import pyplot as plt
 from PIL import Image
 from torchvision import transforms as trans
 
-from utils import get_time, gen_plot, hflip_batch, \
-        separate_bn_paras, cosineDim1, MultipleOptimizer
+from utils import get_time, gen_plot, plot_scatter, hflip_batch, \
+        separate_bn_paras, cosineDim1, MultipleOptimizer,\
+        getTFNPString, heatmap, annotate_heatmap
 from data.data_pipe import de_preprocess, get_train_loader, get_val_data
 from model import Backbone, Arcface, MobileFaceNet, Am_softmax, l2_norm, Backbone_FC2Conv
 from networks import AttentionXCosNet
-from verifacation import evaluate, evaluate_attention
+from verification import evaluate, evaluate_attention
 from losses import l2normalize, CosAttentionLoss
 plt.switch_backend('agg')
 
@@ -31,7 +33,14 @@ class face_learner(object):
             self.model = Backbone_FC2Conv(conf.net_depth, conf.drop_ratio, conf.net_mode).to(conf.device)
             print('{}_{} model generated'.format(conf.net_mode, conf.net_depth))
 
-        if not inference:
+        # Attention Model
+        self.model_attention = AttentionXCosNet(conf).to(conf.device)
+        self.attention_loss = CosAttentionLoss()
+
+        if inference:
+            self.threshold = conf.threshold
+            self.threshold_xCos = conf.threshold_xCos
+        else:  # Training mode
             # Create model_gt for cos_gt generation
             self.model_tgt = Backbone(conf.net_depth,
                                       conf.drop_ratio, conf.net_mode)
@@ -40,10 +49,6 @@ class face_learner(object):
                                            .format(conf.pretrainedMdl)))
             self.model_tgt = self.model_tgt.eval()
 
-            # Attention
-            #TODO
-            self.model_attention = AttentionXCosNet(conf).to(conf.device)
-            self.attention_loss = CosAttentionLoss()
 
             self.milestones = conf.milestones
             self.loader, self.class_num = get_train_loader(conf)
@@ -75,15 +80,13 @@ class face_learner(object):
             print('optimizers generated')
             self.board_loss_every = len(self.loader) // 100
             self.evaluate_every = len(self.loader) // 10#10
-            self.save_every = len(self.loader)//1  # 5
+            self.save_every = len(self.loader)//5
             '''
             self.lfw: (12000, 3, 112, 112)
             self.lfw_issame: (6000,)
             '''
             self.agedb_30, self.cfp_fp, self.lfw, self.agedb_30_issame, self.cfp_fp_issame, self.lfw_issame = get_val_data(self.loader.dataset.root.parent)
 
-        else:
-            self.threshold = conf.threshold
 
     def getCos(self, imgs):
         '''
@@ -184,12 +187,9 @@ class face_learner(object):
         self.model.returnGrid = True
         return accuracy.mean(), best_thresholds.mean(), roc_curve_tensor
 
-    def evaluate_attention(self, conf, carray, issame, nrof_folds = 5, tta = False):
+    def getXCos(self, carray, conf, tta=False, attention=None, returnCosGt=False, returnXCAP=False):
         '''
-        carray: list (2 * # of pairs, 3, 112, 112)
-        issame: list (# of pairs,)
-        emb_batch: tensor [bs, 32, 7, 7]
-        xCoses: list (# of pairs,)
+        returnXCAP: return xCoses, Coses, attentionMaps, cosPatchedMaps
         '''
         self.model.eval()
         self.model.returnGrid = True  # Remember to reset this before return!
@@ -198,51 +198,219 @@ class face_learner(object):
         idx = 0
         idx_xCos = 0
         xCoses = np.zeros(len(carray)//2)  # XXX I fix the size...
+        gtCoses = np.zeros(len(carray)//2)
+        cosPatchedMaps = np.zeros((len(carray)//2, 7, 7))
+        attentionMaps = np.zeros((len(carray)//2, 7, 7))
+
         with torch.no_grad():
+            def batch2feat(batch, conf, tta):
+                if tta:
+                    fliped = hflip_batch(batch)
+                    femb_bat1, emb_batch_1 = self.model(batch.to(conf.device))
+                    femb_bat2, emb_batch_2 = self.model(fliped.to(conf.device))
+                    # XXX or l2norm?
+                    emb_batch = (emb_batch_1 + emb_batch_2) / 2
+                    femb_bat = (femb_bat1 + femb_bat2) / 2
+                else:
+                    femb_bat, emb_batch = self.model(batch.to(conf.device))
+                return femb_bat, emb_batch
+
+            def computeXCosWithAttention(emb_batch, attention):
+                # Calculate Attention
+                grid_feat1 = emb_batch[0::2]  # grid_feat1: (bs//2, 32, 7, 7)
+                grid_feat2 = emb_batch[1::2]
+                if attention is None:
+                    # Size of attention: (bs//2, 1, 7, 7)
+                    attention = self.model_attention(grid_feat1, grid_feat2)
+                # Size of xCos: (bs//2,)
+                xCos, cos_patched = self.attention_loss.computeXCos(
+                        grid_feat1, grid_feat2, attention,
+                        returnCosPatched=True)
+                attention = torch.squeeze(attention.permute(0, 2, 3, 1))
+                return xCos, attention, cos_patched
+
+            def batch2XCosAndGtCos(batch, attention, conf, tta):
+                femb_bat, emb_batch = batch2feat(batch, conf, tta)
+
+                xCos, attentionMap, cos_patched = computeXCosWithAttention(
+                        emb_batch, attention)
+                gtCos = cosineDim1(femb_bat[0::2], femb_bat[1::2])
+                # Store batch to xCos matrix
+                xCos = xCos.cpu().numpy()
+                gtCos = gtCos.cpu().numpy()
+                cos_patched = cos_patched.cpu().numpy()
+                attentionMap = attentionMap.cpu().numpy()
+                return xCos, gtCos, cos_patched, attentionMap
+
             while idx + conf.batch_size <= len(carray):
                 batch = torch.tensor(carray[idx:idx + conf.batch_size])
-                if tta:
-                    fliped = hflip_batch(batch)
-                    _, emb_batch_1 = self.model(batch.to(conf.device))
-                    _, emb_batch_2 = self.model(fliped.to(conf.device))
-                    # XXX or l2norm?
-                    emb_batch = (emb_batch_1 + emb_batch_2) / 2
+                xCos, gtCos, cos_patched, attentionMap = batch2XCosAndGtCos(
+                        batch, attention, conf, tta)
 
-                else:
-                    _, emb_batch  = self.model(batch.to(conf.device))
+                idx_xCosEnd = idx_xCos + conf.batch_size//2
+                xCoses[idx_xCos:idx_xCosEnd] = xCos
+                gtCoses[idx_xCos:idx_xCosEnd] = gtCos
+                cosPatchedMaps[idx_xCos:idx_xCosEnd] = cos_patched
+                attentionMaps[idx_xCos:idx_xCosEnd] = attentionMap
 
-                # Calculate Attention
-                grid_feat1 = emb_batch[0::2]
-                grid_feat2 = emb_batch[1::2]
-                attention = self.model_attention(grid_feat1, grid_feat2)
-                xCos = self.attention_loss.computeXCos(grid_feat1, grid_feat2, attention)
-                # Store batch to xCos matrix
-                xCoses[idx_xCos:idx_xCos + conf.batch_size//2] = xCos.cpu().numpy()
                 idx += conf.batch_size
                 idx_xCos += conf.batch_size//2
+
             if idx < len(carray):
                 batch = torch.tensor(carray[idx:])
-                if tta:
-                    fliped = hflip_batch(batch)
-                    _, emb_batch_1 = self.model(batch.to(conf.device))
-                    _, emb_batch_2 = self.model(fliped.to(conf.device))
-                    # XXX or l2norm?
-                    emb_batch = (emb_batch_1 + emb_batch_2) / 2
-                else:
-                    _, emb_batch = self.model(batch.to(conf.device))
-                # Calculate Attention
-                grid_feat1 = emb_batch[0::2]
-                grid_feat2 = emb_batch[1::2]
-                attention = self.model_attention(grid_feat1, grid_feat2)
-                xCos = self.attention_loss.computeXCos(grid_feat1, grid_feat2, attention)
-                # Store batch to xCos matrix
-                xCoses[idx_xCos:] = xCos.cpu().numpy()
-        tpr, fpr, accuracy, best_thresholds = evaluate_attention(xCoses, issame, nrof_folds)
+                xCos, gtCos, cos_patched, attentionMap = batch2XCosAndGtCos(
+                        batch, attention, conf, tta)
+
+                xCoses[idx_xCos:] = xCos
+                gtCoses[idx_xCos:] = gtCos
+                cosPatchedMaps[idx_xCos:] = cos_patched
+                attentionMaps[idx_xCos:] = attentionMap
+        if returnXCAP:
+            return xCoses, gtCoses, attentionMaps, cosPatchedMaps
+
+        if returnCosGt:
+            return xCoses, gtCoses
+        else:
+            return xCoses
+
+    def evaluate_attention(self, conf, carray, issame,
+                           nrof_folds=5, tta=False, attention=None):
+        '''
+        carray: list (2 * # of pairs, 3, 112, 112)
+        issame: list (# of pairs,)
+        emb_batch: tensor [bs, 32, 7, 7]
+        xCoses: list (# of pairs,)
+        attention: GPUtorch.FloatTensor((bs//2, 1, 7, 7)),is ones/sum() or corr
+        '''
+        xCoses = self.getXCos(carray, conf, tta=tta, attention=attention)
+        tpr, fpr, accuracy, best_thresholds = evaluate_attention(
+                xCoses, issame, nrof_folds)
         buf = gen_plot(fpr, tpr)
         roc_curve = Image.open(buf)
         roc_curve_tensor = trans.ToTensor()(roc_curve)
-        self.model.returnGrid = True
         return accuracy.mean(), best_thresholds.mean(), roc_curve_tensor
+
+    def plot_CorrBtwXCosAndCos(self, conf, carray, issame,
+                           nrof_folds=5, tta=False, attention=None):
+        '''
+        carray: list (2 * # of pairs, 3, 112, 112)
+        issame: list (# of pairs,)
+        emb_batch: tensor [bs, 32, 7, 7]
+        xCoses: list (# of pairs,)
+        attention: GPUtorch.FloatTensor((bs//2, 1, 7, 7)),is ones/sum() or corr
+        '''
+        xCoses, gtCoses = self.getXCos(carray, conf, tta=tta, attention=attention, returnCosGt=True)
+        # tpr, fpr, accuracy, best_thresholds = evaluate_attention(
+        #         xCoses, issame, nrof_folds)
+        title = 'xCos vs Cos on lfw 6000 pairs'
+        buf = plot_scatter(xCoses, gtCoses, title, 'xCos', 'Cos')
+        corrPlot = Image.open(buf)
+        corrPlot_tensor = trans.ToTensor()(corrPlot)
+        return corrPlot_tensor
+
+    def plot_Examples(self, conf, carray, issame,
+                      nrof_folds=5, tta=False, attention=None,
+                      exDir='defaultExamples'):
+        '''
+        carray: list (2 * # of pairs, 3, 112, 112)
+        issame: list (# of pairs,)
+        emb_batch: tensor [bs, 32, 7, 7]
+        xCoses: list (# of pairs,)
+        attention: GPUtorch.FloatTensor((bs//2, 1, 7, 7)),is ones/sum() or corr
+        '''
+        exPath = str(self.conf.work_path) + '/' + exDir
+        if not os.path.exists(exPath):
+            os.makedirs(exPath)
+
+        xCoses, gtCoses, attentionMaps, cosPatchedMaps = self.getXCos(
+                carray, conf, tta=tta, attention=attention, returnXCAP=True)
+        # tpr, fpr, accuracy, best_thresholds = evaluate_attention(
+        #         xCoses, issame, nrof_folds)
+
+        threshold = conf.threshold_xCos
+        for i, xCos in enumerate(tqdm(xCoses)):
+            gtCos = gtCoses[i]
+            attentionMap = attentionMaps[i]
+            cosPatchedMap = cosPatchedMaps[i]
+            img1Idx = i * 2
+            img2Idx = img1Idx + 1
+            img1 = ((carray[img1Idx] * 0.5 + 0.5) * 255).astype('uint8')
+            img2 = ((carray[img2Idx] * 0.5 + 0.5) * 255).astype('uint8')
+            isTheSamePerson = issame[i]
+
+            self.plot_attention_example(gtCos, xCos, threshold,
+                    cosPatchedMap, attentionMap, img1, img2,
+                    isTheSamePerson, exPath)
+        #TODO
+        # buf = plot_scatter(xCoses, gtCoses, title, 'xCos', 'Cos')
+        # corrPlot = Image.open(buf)
+        # corrPlot_tensor = trans.ToTensor()(corrPlot)
+        return
+
+    def plot_attention_example(self, cos_fr, cos_x, threshold,
+                               cos_patch, weight_attention,
+                               image1, image2, isSame, exPath):
+        # XXX This function can be moved to utils.py?
+        name1, name2 = 'Left', 'Right'
+        isSame = int(isSame)
+        image1 = np.transpose(image1,(1, 2, 0))
+        image2 = np.transpose(image2,(1, 2, 0))
+        image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
+        image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
+
+        same = 1 if float(cos_fr) > threshold else 0
+        title_str = getTFNPString(isSame, same)
+        # Create visualization
+        fig_size = (14, 3)
+        # fig = plt.figure(tight_layout=True, figsize=fig_size)
+        # fig = plt.figure(tight_layout=True)
+        fig, axs = plt.subplots(1, 4, tight_layout=True, figsize=fig_size)
+        fig.suptitle(title_str +
+                     ' Cos=%.2f xCos=%.2f' % (float(cos_fr), cos_x))
+
+        [axs[i].set_axis_off() for i in range(4)]
+        # axs[0].text(0.5, 0.5, title_str + '\n Cos=%.2f\nxCos=%.2f'%(float(cos_fr), cos_x))
+        axs[0].set_title('Face 1', y=-0.1)
+        axs[1].set_title('Face 2', y=-0.1)
+        axs[2].set_title(r'$cos_{patch}$', y=-0.1)
+        axs[3].set_title(r'$weight_{attetion}$', y=-0.1)
+
+        def drawGridLines(image_t, w_lines=5, h_lines=6):
+            h, w, _ = image_t.shape
+            w_unit = int(w // w_lines)
+            w_start = int(w_unit // 2)
+            h_unit = int(h // h_lines)
+            h_start = int(h_unit // 2)
+            # Draw vertical grid lines
+            for step in range(w_lines):
+                start_pt = (w_start + w_unit * step, 0)
+                end_pt = (w_start + w_unit * step, h)
+                cv2.line(image_t, start_pt, end_pt, (255, 0, 0), 1, 1)
+            # Draw horizontal grid lines
+            for step in range(h_lines):
+                start_pt = (0, h_start + h_unit * step)
+                end_pt = (w, h_start + h_unit * step)
+                cv2.line(image_t, start_pt, end_pt, (255, 0, 0), 1, 1)
+        drawGridLines(image1, 6, 6)
+        drawGridLines(image2, 6, 6)
+        axs[0].imshow(image1)
+        axs[1].imshow(image2)
+        # Show cos_patch
+        im, cbar = heatmap(cos_patch, [], [], ax=axs[2],
+                           cmap="YlGn", cbarlabel=r'$cos_{patched}$')
+        texts = annotate_heatmap(im, valfmt="{x:.2f}")
+        # Show weights_attention
+        im, cbar = heatmap(weight_attention, [], [], ax=axs[3],
+                           cmap="YlGn", cbarlabel=r'$weight_{attetion}$')
+        texts = annotate_heatmap(im, valfmt="{x:.2f}")
+        # axs[3].imshpw(cos_patch)
+        # axs[4].imshow(weight_attention)
+        plt.show()
+        img_name = exPath + '/' + title_str + \
+            "_COS_%5.4f_xCos_%5.4f" % (float(cos_fr), cos_x) + '.png'
+        plt.savefig(img_name, bbox_inches='tight')
+        plt.gcf().clear()
+        return
 
     # def find_lr(self,
     #             conf,
@@ -320,6 +488,12 @@ class face_learner(object):
                         model_atten=False)
         self.model.train()
         self.model_attention.train()
+        # print('>>> Initialize, testing xCos on lfw')
+        # accuracy, best_threshold, roc_curve_tensor = self.evaluate_attention(conf, self.lfw, self.lfw_issame)
+        # self.board_val('lfw_xCos', accuracy, best_threshold, roc_curve_tensor)
+        # self.model.train()
+        # self.model_attention.train()
+        # print('>>>> done testing, xCos accuracy on LFW:', accuracy)
         running_loss = 0.
         for e in range(epochs):
             print('epoch {} started'.format(e))

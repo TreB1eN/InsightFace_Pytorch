@@ -19,7 +19,7 @@ class CosAttentionLoss(nn.Module):
     def __init__(self):
         super(CosAttentionLoss, self).__init__()
 
-    def computeXCos(self, feat_grid_1, feat_grid_2, attention):
+    def computeXCos(self, feat_grid_1, feat_grid_2, attention, returnCosPatched=False):
         attention = attention.permute(0, 2, 3, 1)
         feat1 = feat_grid_1.permute(0, 2, 3, 1)
         feat2 = feat_grid_2.permute(0, 2, 3, 1)
@@ -32,7 +32,10 @@ class CosAttentionLoss(nn.Module):
         # cos_a:  torch.Size([bs, 7, 7, 1]) ->[bs, 49]
         cos_attentioned = cos_attentioned.view(cos_attentioned.size(0), -1)
         cos_attentioned = cos_attentioned.sum(1)
-        return cos_attentioned
+        if returnCosPatched:
+            return cos_attentioned, torch.squeeze(cos_patched)
+        else:
+            return cos_attentioned
 
     def forward(self, feat_grid_1, feat_grid_2, attention,
                 cos_tgt, size_average=True):

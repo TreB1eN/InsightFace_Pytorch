@@ -15,7 +15,7 @@ def get_config(training = True):
     conf.log_path = conf.work_path/'log/'
     conf.save_path = conf.work_path/'save'
     conf.exp_title = 'xCos'
-    conf.exp_comment = 'expCASIA'
+    conf.exp_comment = 'expMS1M'
     conf.input_size = [112,112]
     conf.embedding_size = 1568 #3136 #512
     conf.use_mobilfacenet = False
@@ -30,7 +30,7 @@ def get_config(training = True):
     conf.data_mode = 'emore'
     conf.vgg_folder = conf.data_path/'faces_vgg_112x112'
     conf.ms1m_folder = conf.data_path/'faces_ms1m_112x112'
-    conf.emore_folder = conf.data_path/'faces_webface_112x112' # 'faces_emore'
+    conf.emore_folder = conf.data_path/'faces_emore'#'faces_webface_112x112' # 'faces_emore'
     conf.batch_size = 100 # irse net depth 50
 #   conf.batch_size = 200 # mobilefacenet
 #--------------------Training Config ------------------------
@@ -51,6 +51,7 @@ def get_config(training = True):
     else:
         conf.facebank_path = conf.data_path/'facebank'
         conf.threshold = 1.5
+        conf.threshold_xCos = 0.2338
         conf.face_limit = 10
         #when inference, at maximum detect 10 faces in one image, my laptop is slow
         conf.min_face_size = 30
