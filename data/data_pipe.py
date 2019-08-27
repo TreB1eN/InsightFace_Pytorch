@@ -12,10 +12,12 @@ import torch
 import mxnet as mx
 from tqdm import tqdm
 
-from .datasets import SiameseImageFolder
+from .datasets import SiameseImageFolder, CArrayDataset
+
 
 def de_preprocess(tensor):
     return tensor*0.5 + 0.5
+
 
 def get_train_dataset_backup(imgs_folder):
     train_transform = trans.Compose([
@@ -27,6 +29,7 @@ def get_train_dataset_backup(imgs_folder):
     class_num = ds[-1][1] + 1
     return ds, class_num
 
+
 def get_train_dataset(imgs_folder):
     train_transform = trans.Compose([
         trans.RandomHorizontalFlip(),
@@ -36,6 +39,7 @@ def get_train_dataset(imgs_folder):
     ds = SiameseImageFolder(imgs_folder, train_transform)
     class_num = ds.class_num
     return ds, class_num
+
 
 def get_train_loader(conf):
     # XXX conf permision
@@ -61,7 +65,8 @@ def get_train_loader(conf):
     loader = DataLoader(ds, batch_size=conf.batch_size, shuffle=True, pin_memory=conf.pin_memory, num_workers=conf.num_workers)
     return loader, class_num
 
-def load_bin(path, rootdir, transform, image_size=[112,112]):
+
+def load_bin(path, rootdir, transform, image_size=[112, 112]):
     if not rootdir.exists():
         rootdir.mkdir()
     bins, issame_list = pickle.load(open(path, 'rb'), encoding='bytes')
@@ -79,16 +84,19 @@ def load_bin(path, rootdir, transform, image_size=[112,112]):
     np.save(str(rootdir)+'_list', np.array(issame_list))
     return data, issame_list
 
+
 def get_val_pair(path, name):
     carray = bcolz.carray(rootdir = path/name, mode='r')
     issame = np.load(path/'{}_list.npy'.format(name))
     return carray, issame
+
 
 def get_val_data(data_path):
     agedb_30, agedb_30_issame = get_val_pair(data_path, 'agedb_30')
     cfp_fp, cfp_fp_issame = get_val_pair(data_path, 'cfp_fp')
     lfw, lfw_issame = get_val_pair(data_path, 'lfw')
     return agedb_30, cfp_fp, lfw, agedb_30_issame, cfp_fp_issame, lfw_issame
+
 
 def load_mx_rec(rec_path):
     save_path = rec_path/'imgs'
@@ -107,6 +115,37 @@ def load_mx_rec(rec_path):
         if not label_path.exists():
             label_path.mkdir()
         img.save(label_path/'{}.jpg'.format(idx), quality=95)
+
+
+class CarrayLoader:
+    def __init__(self, carray, conf):
+        self.carray = carray
+        self.batch_size = conf.batch_size
+
+    def __iter__(self):
+        self.idx = 0
+        return self
+
+    def __next__(self):
+        if self.idx + self.batch_size <= len(self.carray):
+            output = torch.tensor(self.carray[self.idx: self.idx + self.batch_size])
+        elif self.idx < len(self.carray):
+            output = torch.tensor(self.carray[self.idx:])
+        else:
+            raise StopIteration
+        self.idx += self.batch_size
+        return output
+
+
+def loader_from_carray(carray: np.ndarray, conf, strategy='iterable'):
+    if strategy == 'iterable':
+        loader = CarrayLoader(carray, conf)
+    elif strategy == 'data_loader':
+        dataset = CArrayDataset(carray)
+        loader = DataLoader(dataset, batch_size=conf.batch_size, shuffle=False, num_workers=8)
+    else:
+        raise NotImplementedError
+    return loader
 
 # class train_dataset(Dataset):
 #     def __init__(self, imgs_bcolz, label_bcolz, h_flip=True):

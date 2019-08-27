@@ -94,6 +94,8 @@ class SiameseWholeFace(Dataset):
         self.train = self.wFace_dataset.train
         self.memoryAll = self.wFace_dataset.memoryAll
 
+
+
         if self.train:
             self.train_labels = self.wFace_dataset.train_labels
             self.train_data = self.wFace_dataset
@@ -721,6 +723,17 @@ class DataMix:
 
     def __len__(self):
         return self._data_len
+
+
+class CArrayDataset(Dataset):
+    def __init__(self, carray):
+        self.carray = carray
+
+    def __getitem__(self, idx):
+        return self.carray[idx]
+
+    def __len__(self):
+        return len(self.carray)
 
 
 if __name__ == "__main__":
