@@ -235,6 +235,15 @@ class face_learner(object):
         self.model.returnGrid = True
         return accuracy.mean(), best_thresholds.mean(), roc_curve_tensor
 
+    def _to_loader(self, carray_or_loader, conf):
+        if isinstance(carray_or_loader, torch.utils.data.DataLoader):
+            loader = carray_or_loader
+        elif isinstance(carray_or_loader, bcolz.carray_ext.carray):
+            loader = loader_from_carray(carray_or_loader, conf)
+        else:
+            raise NotImplementedError()
+        return loader
+
     def getXCos(self, carray, conf, tta=False, attention=None, returnCosGt=False, returnXCAP=False):
         '''
         returnXCAP: return xCoses, Coses, attentionMaps, cosPatchedMaps
@@ -242,13 +251,7 @@ class face_learner(object):
         self.model.eval()
         self.model.returnGrid = True  # Remember to reset this before return!
         self.model_attention.eval()
-
-        if isinstance(carray, torch.utils.data.DataLoader):
-            loader = carray
-        elif isinstance(carray, bcolz.carray_ext.carray):
-            loader = loader_from_carray(carray, conf)
-        else:
-            raise NotImplementedError()
+        loader = self._to_loader(carray, conf)
 
         output_keys = ['xCos', 'gtCos', 'cosPatchedMap', 'attentionMap']
         output_dict = {key: [] for key in output_keys}
@@ -316,6 +319,29 @@ class face_learner(object):
         else:
             return output_dict['xCos']
 
+    def get_original_cosines(self, carray, conf, tta=False):
+        self.model.eval()
+        self.model.returnGrid = True  # Remember to reset this before return!
+        self.model_attention.eval()
+        assert conf.batch_size % 2 == 0, "Need even batch size"
+        loader = self._to_loader(carray, conf)
+
+        cosines = []
+        with torch.no_grad():
+            for batch in loader:
+                if tta:
+                    fliped = hflip_batch(batch)
+                    feat_orig = self.model.get_original_feature(batch.to(conf.device))
+                    feat_flip = self.model.get_original_feature(fliped.to(conf.device))
+                    feat = (feat_orig + feat_flip) / 2
+                else:
+                    feat = self.model.get_original_feature(batch)
+                feat_left_person = l2normalize(feat[0::2])
+                feat_right_person = l2normalize(feat[1::2])
+                cosine = cosineDim1(feat_left_person, feat_right_person)
+                cosines.append(cosine.cpu().numpy())
+        return np.concatenate(cosines, axis=0)
+
     def evaluate_attention(self, conf, carray, issame,
                            nrof_folds=5, tta=False, attention=None):
         '''
@@ -326,8 +352,10 @@ class face_learner(object):
         attention: GPUtorch.FloatTensor((bs//2, 1, 7, 7)),is ones/sum() or corr
         '''
         xCoses = self.getXCos(carray, conf, tta=tta, attention=attention)
-        tpr, fpr, accuracy, best_thresholds = evaluate_attention(
-                xCoses, issame, nrof_folds)
+        return self.evaluate_and_plot_roc(xCoses, issame, nrof_folds)
+
+    def evaluate_and_plot_roc(self, coses, issame, nrof_folds=5):
+        tpr, fpr, accuracy, best_thresholds = evaluate_attention(coses, issame, nrof_folds)
         buf = gen_plot(fpr, tpr)
         roc_curve = Image.open(buf)
         roc_curve_tensor = trans.ToTensor()(roc_curve)

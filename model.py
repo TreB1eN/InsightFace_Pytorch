@@ -189,6 +189,13 @@ class Backbone_FC2Conv(Module):
         else:
             return l2_norm(x)
 
+    def get_original_feature(self, x):
+        x = self.input_layer(x)
+        x = self.body(x)
+        x = self.output_layer(x)
+        return l2_norm(x)
+
+
 ##################################  MobileFaceNet #############################################################
 
 class Conv_block(Module):
