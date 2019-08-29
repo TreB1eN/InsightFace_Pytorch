@@ -1,4 +1,7 @@
+import os.path as op
+
 import numpy as np
+import pandas as pd
 from PIL import Image
 import torch
 import torch.nn as nn
@@ -734,6 +737,53 @@ class CArrayDataset(Dataset):
 
     def __len__(self):
         return len(self.carray)
+
+
+class IJBCVerificationDataset(Dataset):
+    def __init__(self, ijbc_data_root):
+        # read all csvs neccesary for verification
+        self.ijbc_data_root = ijbc_data_root
+        self.metadata = pd.read_csv(op.join(ijbc_data_root, 'protocols', 'ijbc_metadata_with_age.csv'))
+        test1_dir = op.join(ijbc_data_root, 'protocols', 'test1')
+        self.enroll_templates = pd.read_csv(op.join(test1_dir, 'enroll_templates.csv'))
+        self.verif_templates = pd.read_csv(op.join(test1_dir, 'verif_templates.csv'))
+        self.match = pd.read_csv(op.join(test1_dir, 'match.csv'))
+
+        self.transforms = transforms.Compose([
+            transforms.Normalize([.5, .5, .5], [.5, .5, .5]),
+            transforms.Resize([112, 112]),
+            transforms.toTensor()
+        ])
+
+    def _get_cropped_face_image_by_entry(self, entry):
+        sid = entry['SUBJECT_ID']
+        filepath = entry['FILE_NAME']
+        img_or_frames, fname = op.split(filepath)
+        fname_index, _ = op.splitext(fname)
+        cropped_path = op.join(self.ijbc_data_root, 'cropped_faces', img_or_frames, f'{sid}_{fname_index}.jpg')
+        return Image.open(cropped_path)
+
+    def _get_tensor_by_entries(self, entries):
+        faces_imgs = [self._get_cropped_face_image_by_entry(e) for idx, e in entries.iterrows()]
+        faces_tensor = torch.stack([self.transforms(img) for img in faces_imgs], axis=0)
+        return faces_tensor
+
+    def __getitem__(self, idx):
+        enroll_tid = self.match.iloc[idx]['ENROLL_TEMPLATE_ID']
+        verif_tid = self.match.iloc[idx]['VERID_TEMPLATE_ID']
+        enroll_entries = self.enroll_templates[self.enroll_templates.TEMPLATE_ID == enroll_tid]
+        verif_entries = self.verif_templates[self.verif_templates.TEMPLATE_ID == verif_tid]
+
+        enroll_faces_tensor = self._get_tensor_by_entries(enroll_entries)
+        verif_faces_tensor = self._get_tensor_by_entries(verif_entries)
+
+        return {
+            "enroll_faces_tensor": enroll_faces_tensor,
+            "verif_faces_tensor": verif_faces_tensor
+        }
+
+    def __len__(self):
+        return len(self.match)
 
 
 if __name__ == "__main__":
