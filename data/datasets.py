@@ -786,6 +786,33 @@ class IJBCVerificationDataset(Dataset):
         return len(self.match)
 
 
+class ARverificationDataset(Dataset):
+    '/tmp3/biolin/datasets/face/ARFace/test2'
+    def __init__(self, dataset_root='/tmp3/biolin/datasets/face/ARFace/test2',
+                 sampled_num=12000, used_condition=('08', '11', '21', '24')):
+        '''
+        Dataset to generate 6000 positive and 6000 negative samples from AR dataset.
+        Following the evaluation process of paper "Towards Interpretable Face Recognition", only
+        faces with eye glasses or scarfs are used (corresponding to our default `used_condition`).
+
+        But we only found 400 satisfied images on AR `test2` directory, which is different from
+        that 810 images claimed by the paper.
+        '''
+        self.sampled_num = sampled_num
+        self.used_condition = used_condition
+        self.dataset_root = dataset_root
+
+    def __getitem__(self, idx):
+        if idx % 2 == 0:
+            positive = True
+            pass
+        else:
+            positive = False
+            pass
+
+    def __len__(self):
+        return sampled_num
+
 if __name__ == "__main__":
     with torch.no_grad():
         # dataset = ENMDataset(config.FEAT_DIR, train=False, valSize=0.05)
