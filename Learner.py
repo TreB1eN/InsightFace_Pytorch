@@ -13,7 +13,7 @@ from torchvision import transforms as trans
 
 from utils import get_time, gen_plot, plot_scatter, hflip_batch, \
         separate_bn_paras, cosineDim1, MultipleOptimizer,\
-        getTFNPString, heatmap, annotate_heatmap
+        getTFNPString, heatmap, heatmap_seaborn, annotate_heatmap
 from data.data_pipe import de_preprocess, get_train_loader, get_val_data
 from model import Backbone, Arcface, MobileFaceNet, Am_softmax, l2_norm, Backbone_FC2Conv
 from networks import AttentionXCosNet
@@ -399,9 +399,9 @@ class face_learner(object):
         axs[0].imshow(image1)
         axs[1].imshow(image2)
         # Show cos_patch
-        im, cbar = heatmap(cos_patch, [], [], ax=axs[2],
-                           cmap="YlGn", cbarlabel=r'$cos_{patched}$')
-        texts = annotate_heatmap(im, valfmt="{x:.2f}")
+        im, cbar = heatmap_seaborn(cos_patch, [], [], ax=axs[2],
+                           cmap="bwr", cbarlabel=r'$cos_{patched}$')
+        # texts = annotate_heatmap(im, valfmt="{x:.2f}")
         # Show weights_attention
         im, cbar = heatmap(weight_attention, [], [], ax=axs[3],
                            cmap="YlGn", cbarlabel=r'$weight_{attetion}$')
