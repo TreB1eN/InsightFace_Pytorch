@@ -190,12 +190,12 @@ def getTFNPString(same, isSame_pred):
     title_str = 'LL'
     if same == 1 and int(isSame_pred) == 0:
         # not the same person but predicted the same]
-        # False positive
-        title_str = 'False_Positive'
-
-    elif same == 0 and int(isSame_pred) == 1:
         # False negative
         title_str = 'False_Negative'
+
+    elif same == 0 and int(isSame_pred) == 1:
+        # False positive
+        title_str = 'False_Positive'
 
     elif same == 1 and int(isSame_pred) == 1:
         # True positive
@@ -268,7 +268,7 @@ def heatmap(data, row_labels, col_labels, ax=None,
     return im, cbar
 
 def heatmap_seaborn(data, row_labels, col_labels, ax=None,
-            cmap=None, cbarlabel="", **kwargs):
+            cmap=None, cbarlabel="", threshold=0.5, **kwargs):
     """
     Create a heatmap from a numpy array and two lists of labels.
 
@@ -296,7 +296,7 @@ def heatmap_seaborn(data, row_labels, col_labels, ax=None,
         ax = plt.gca()
 
     # Plot the heatmap
-    g = sns.heatmap(data, ax=ax, center=0.5, vmin=-1, vmax=1,
+    g = sns.heatmap(data, ax=ax, center=threshold, vmin=-1, vmax=1,
             cmap=cmap, cbar_kws={'label': cbarlabel},
             annot=True, fmt=".2f")
 

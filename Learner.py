@@ -400,7 +400,7 @@ class face_learner(object):
         axs[1].imshow(image2)
         # Show cos_patch
         im, cbar = heatmap_seaborn(cos_patch, [], [], ax=axs[2],
-                           cmap="bwr", cbarlabel=r'$cos_{patched}$')
+                           cmap="RdBu", cbarlabel=r'$cos_{patched}$', threshold=threshold)
         # texts = annotate_heatmap(im, valfmt="{x:.2f}")
         # Show weights_attention
         im, cbar = heatmap(weight_attention, [], [], ax=axs[3],
