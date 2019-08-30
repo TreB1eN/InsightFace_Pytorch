@@ -35,7 +35,7 @@ class face_learner(object):
 
         # Attention Model
         self.model_attention = AttentionXCosNet(conf).to(conf.device)
-        self.attention_loss = CosAttentionLoss()
+        self.xCos_loss_with_attention = CosAttentionLoss()
 
         if inference:
             self.threshold = conf.threshold
@@ -73,6 +73,7 @@ class face_learner(object):
                                     {'params': paras_only_bn}
                                 ], lr = conf.lr, momentum = conf.momentum)
                 print(self.optimizer_fr)
+            #TODO 0827
             self.optimizer_atten = optim.Adam(self.model_attention.parameters(), lr=conf.lr)
             # self.optimizer = MultipleOptimizer(self.optimizer_fr, self.optimizer_atten
 #             self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=40, verbose=True)
@@ -223,9 +224,10 @@ class face_learner(object):
                     # Size of attention: (bs//2, 1, 7, 7)
                     attention = self.model_attention(grid_feat1, grid_feat2)
                 # Size of xCos: (bs//2,)
-                xCos, cos_patched = self.attention_loss.computeXCos(
+                xCos, cos_patched = self.xCos_loss_with_attention.computeXCos(
                         grid_feat1, grid_feat2, attention,
                         returnCosPatched=True)
+                # Squeeze for channel dimension
                 attention = torch.squeeze(attention.permute(0, 2, 3, 1))
                 return xCos, attention, cos_patched
 
@@ -234,6 +236,7 @@ class face_learner(object):
 
                 xCos, attentionMap, cos_patched = computeXCosWithAttention(
                         emb_batch, attention)
+                # XXX
                 gtCos = cosineDim1(femb_bat[0::2], femb_bat[1::2])
                 # Store batch to xCos matrix
                 xCos = xCos.cpu().numpy()
@@ -291,7 +294,7 @@ class face_learner(object):
         return accuracy.mean(), best_thresholds.mean(), roc_curve_tensor
 
     def plot_CorrBtwXCosAndCos(self, conf, carray, issame,
-                           nrof_folds=5, tta=False, attention=None):
+                               nrof_folds=5, tta=False, attention=None):
         '''
         carray: list (2 * # of pairs, 3, 112, 112)
         issame: list (# of pairs,)
@@ -534,7 +537,14 @@ class face_learner(object):
                 grid_feat2s = grid_feats[half_idx:]
                 attention = self.model_attention(grid_feat1s, grid_feat2s)
 
-                loss2 = self.attention_loss(grid_feat1s, grid_feat2s, attention, cos_gts)
+                if conf.detachAttentionGradient:
+                    grid_feat1s = grid_feat1s.detach()
+                    grid_feat2s = grid_feat2s.detach()
+
+                loss2 = self.xCos_loss_with_attention(grid_feat1s,
+                                                      grid_feat2s,
+                                                      attention,
+                                                      cos_gts)
                 # TODO alpha weight
                 alpha = 0.5
                 loss = alpha * loss1 + (1 - alpha) * loss2
