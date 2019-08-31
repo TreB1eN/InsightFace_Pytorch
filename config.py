@@ -19,6 +19,7 @@ def get_config(training = True):
     conf.input_size = [112,112]
     conf.embedding_size = 1568 #3136 #512
     conf.use_mobilfacenet = False
+    conf.modelType = 'ArcFace'
     conf.net_depth = 50
     conf.drop_ratio = 0.6
     conf.net_mode = 'ir_se' # or 'ir'
@@ -46,7 +47,7 @@ def get_config(training = True):
         conf.pin_memory = True
 #         conf.num_workers = 4 # when batchsize is 200
         conf.num_workers = 1
-        conf.ce_loss = CrossEntropyLoss()
+        # conf.ce_loss = CrossEntropyLoss()
 #--------------------Inference Config ------------------------
     else:
         conf.facebank_path = conf.data_path/'facebank'

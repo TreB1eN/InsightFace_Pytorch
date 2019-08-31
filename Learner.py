@@ -5,6 +5,7 @@ import bcolz
 import torch
 import numpy as np
 from torch import optim
+from torch.nn import CrossEntropyLoss
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 from matplotlib import pyplot as plt
@@ -17,6 +18,7 @@ from utils import get_time, gen_plot, plot_scatter, hflip_batch, \
 from data.data_pipe import de_preprocess, get_train_loader, get_val_data
 from model import Backbone, Arcface, MobileFaceNet, Am_softmax, l2_norm, Backbone_FC2Conv
 from networks import AttentionXCosNet
+from net_sphere import sphere20a, AngleLoss
 from verification import evaluate, evaluate_attention
 from losses import l2normalize, CosAttentionLoss
 plt.switch_backend('agg')
@@ -29,9 +31,19 @@ class face_learner(object):
         if conf.use_mobilfacenet:
             self.model = MobileFaceNet(conf.embedding_size).to(conf.device)
             print('MobileFaceNet model generated')
-        else:
-            self.model = Backbone_FC2Conv(conf.net_depth, conf.drop_ratio, conf.net_mode).to(conf.device)
-            print('{}_{} model generated'.format(conf.net_mode, conf.net_depth))
+        elif conf.modelType == 'ArcFace':
+            self.model = Backbone_FC2Conv(conf.net_depth,
+                                          conf.drop_ratio,
+                                          conf.net_mode).to(conf.device)
+            print('{}_{} model generated'.format(conf.net_mode,
+                                                 conf.net_depth))
+            self.head = Arcface(embedding_size=conf.embedding_size, classnum=self.class_num).to(conf.device)
+            self.loss_fr = CrossEntropyLoss()
+        elif conf.modelType == 'SphereFace':
+            self.model = sphere20a(returnGrid=True).to(conf.device)
+            self.head = AngleLinear(conf.embedding_size, self.class_num).to(conf.device)
+            self.loss_fr = AngleLoss()
+            print('>>> SphereFace model is generated.')
 
         # Attention Model
         self.model_attention = AttentionXCosNet(conf).to(conf.device)
@@ -55,7 +67,6 @@ class face_learner(object):
 
             self.writer = SummaryWriter(os.path.join(conf.log_path, conf.exp_title + '/' + conf.exp_comment))
             self.step = 0
-            self.head = Arcface(embedding_size=conf.embedding_size, classnum=self.class_num).to(conf.device)
 
             print('two model heads generated')
 
@@ -137,7 +148,11 @@ class face_learner(object):
             save_path = conf.save_path
         else:
             save_path = conf.model_path
-        self.model.load_state_dict(torch.load(save_path/'model_{}'.format(fixed_str)), strict=strict)
+        if conf.modelType = 'SphereFace':
+            print('>>>> Loading Sphereface weights')
+            self.model.load_state_dict(torch.load(save_path/'sphere20a_20171020.pth'), strict=strict)
+        else:
+            self.model.load_state_dict(torch.load(save_path/'model_{}'.format(fixed_str)), strict=strict)
         if model_atten:
             self.model_attention.load_state_dict(torch.load(save_path/'model_attention_{}'.format(fixed_str)), strict=strict)
         if not model_only:
@@ -525,7 +540,7 @@ class face_learner(object):
                 # Part1: FR
                 embeddings, grid_feats = self.model(imgs)
                 thetas = self.head(embeddings, labels)
-                loss1 = conf.ce_loss(thetas, labels)
+                loss1 = self.loss_fr(thetas, labels)
 
                 # Part2: xCos
                 cos_gts = self.getCos(imgs)
@@ -562,7 +577,7 @@ class face_learner(object):
                     self.model.train()
                     self.model_attention.train()
                 if self.step % self.save_every == 0 and self.step != 0:
-                    self.save_state(conf, accuracy)
+                    self.save_state(conf, accuracy, extra=conf.modelType)
 
                 self.step += 1
 
