@@ -11,6 +11,7 @@ from PIL import Image
 from torchvision import transforms as trans
 from data.data_pipe import de_preprocess
 from model import l2_norm
+import seaborn as sns
 plt.switch_backend('agg')
 
 cosineDim1 = nn.CosineSimilarity(dim=1, eps=1e-6)
@@ -189,12 +190,12 @@ def getTFNPString(same, isSame_pred):
     title_str = 'LL'
     if same == 1 and int(isSame_pred) == 0:
         # not the same person but predicted the same]
-        # False positive
-        title_str = 'False_Positive'
-
-    elif same == 0 and int(isSame_pred) == 1:
         # False negative
         title_str = 'False_Negative'
+
+    elif same == 0 and int(isSame_pred) == 1:
+        # False positive
+        title_str = 'False_Positive'
 
     elif same == 1 and int(isSame_pred) == 1:
         # True positive
@@ -265,6 +266,70 @@ def heatmap(data, row_labels, col_labels, ax=None,
     ax.tick_params(which="minor", bottom=False, left=False)
 
     return im, cbar
+
+def heatmap_seaborn(data, row_labels, col_labels, ax=None,
+            cmap=None, cbarlabel="", threshold=0.5, **kwargs):
+    """
+    Create a heatmap from a numpy array and two lists of labels.
+
+    Parameters
+    ----------
+    data
+        A 2D numpy array of shape (N, M).
+    row_labels
+        A list or array of length N with the labels for the rows.
+    col_labels
+        A list or array of length M with the labels for the columns.
+    ax
+        A `matplotlib.axes.Axes` instance to which the heatmap is plotted.  If
+        not provided, use current axes or create a new one.  Optional.
+    cbar_kw
+        A dictionary with arguments to `matplotlib.Figure.colorbar`.  Optional.
+    cbarlabel
+        The label for the colorbar.  Optional.
+    **kwargs
+        All other arguments are forwarded to `imshow`.
+    """
+
+    if not ax:
+        exit('no ax')
+        ax = plt.gca()
+
+    # Plot the heatmap
+    g = sns.heatmap(data, ax=ax, center=threshold, vmin=-1, vmax=1,
+            cmap=cmap, cbar_kws={'label': cbarlabel},
+            annot=True, fmt=".2f")
+
+    # Create colorbar
+    # cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+    # cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
+    cbar = None
+
+    # We want to show all ticks...
+    ax.set_xticks(np.arange(data.shape[1]))
+    ax.set_yticks(np.arange(data.shape[0]))
+    # ... and label them with the respective list entries.
+    ax.set_xticklabels(col_labels)
+    ax.set_yticklabels(row_labels)
+
+    # Let the horizontal axes labeling appear on top.
+    ax.tick_params(top=True, bottom=False,
+                   labeltop=True, labelbottom=False)
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=-30, ha="right",
+             rotation_mode="anchor")
+
+    # Turn spines off and create white grid.
+    for edge, spine in ax.spines.items():
+        spine.set_visible(False)
+
+    ax.set_xticks(np.arange(data.shape[1]+1)-.5, minor=True)
+    ax.set_yticks(np.arange(data.shape[0]+1)-.5, minor=True)
+    ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    return g, cbar
 
 
 def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
