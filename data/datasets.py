@@ -750,14 +750,14 @@ class IJBCVerificationDataset(Dataset):
         self.match = pd.read_csv(op.join(test1_dir, 'match.csv'))
 
         self.transforms = transforms.Compose([
-            transforms.Normalize([.5, .5, .5], [.5, .5, .5]),
             transforms.Resize([112, 112]),
-            transforms.toTensor()
+            transforms.ToTensor(),
+            transforms.Normalize([.5, .5, .5], [.5, .5, .5]),
         ])
 
     def _get_cropped_face_image_by_entry(self, entry):
         sid = entry['SUBJECT_ID']
-        filepath = entry['FILE_NAME']
+        filepath = entry['FILENAME']
         img_or_frames, fname = op.split(filepath)
         fname_index, _ = op.splitext(fname)
         cropped_path = op.join(self.ijbc_data_root, 'cropped_faces', img_or_frames, f'{sid}_{fname_index}.jpg')
@@ -765,12 +765,12 @@ class IJBCVerificationDataset(Dataset):
 
     def _get_tensor_by_entries(self, entries):
         faces_imgs = [self._get_cropped_face_image_by_entry(e) for idx, e in entries.iterrows()]
-        faces_tensor = torch.stack([self.transforms(img) for img in faces_imgs], axis=0)
-        return faces_tensor
+        faces_tensors = [self.transforms(img) for img in faces_imgs]
+        return torch.stack(faces_tensors, dim=0)
 
     def __getitem__(self, idx):
         enroll_tid = self.match.iloc[idx]['ENROLL_TEMPLATE_ID']
-        verif_tid = self.match.iloc[idx]['VERID_TEMPLATE_ID']
+        verif_tid = self.match.iloc[idx]['VERIF_TEMPLATE_ID']
         enroll_entries = self.enroll_templates[self.enroll_templates.TEMPLATE_ID == enroll_tid]
         verif_entries = self.verif_templates[self.verif_templates.TEMPLATE_ID == verif_tid]
 
