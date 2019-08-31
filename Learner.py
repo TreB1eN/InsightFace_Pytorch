@@ -463,7 +463,7 @@ class face_learner(object):
 
     #         embeddings = self.model(imgs)
     #         thetas = self.head(embeddings, labels)
-    #         loss = conf.ce_loss(thetas, labels)
+    #         loss = conf.loss_fr(thetas, labels)
 
     #         # Compute the smoothed loss
     #         avg_loss = beta * avg_loss + (1 - beta) * loss.item()
