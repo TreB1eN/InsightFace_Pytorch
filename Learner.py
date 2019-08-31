@@ -18,7 +18,7 @@ from utils import get_time, gen_plot, plot_scatter, hflip_batch, \
 from data.data_pipe import de_preprocess, get_train_loader, get_val_data
 from model import Backbone, Arcface, MobileFaceNet, Am_softmax, l2_norm, Backbone_FC2Conv
 from networks import AttentionXCosNet
-from net_sphere import sphere20a, AngleLoss
+from net_sphere import sphere20a, AngleLoss, AngleLinear
 from verification import evaluate, evaluate_attention
 from losses import l2normalize, CosAttentionLoss
 plt.switch_backend('agg')
@@ -28,6 +28,7 @@ class face_learner(object):
     def __init__(self, conf, inference=False):
         print(conf)
         self.conf = conf
+        self.loader, self.class_num = get_train_loader(conf)
         if conf.use_mobilfacenet:
             self.model = MobileFaceNet(conf.embedding_size).to(conf.device)
             print('MobileFaceNet model generated')
@@ -63,7 +64,6 @@ class face_learner(object):
 
 
             self.milestones = conf.milestones
-            self.loader, self.class_num = get_train_loader(conf)
 
             self.writer = SummaryWriter(os.path.join(conf.log_path, conf.exp_title + '/' + conf.exp_comment))
             self.step = 0
@@ -149,7 +149,7 @@ class face_learner(object):
             save_path = conf.save_path
         else:
             save_path = conf.model_path
-        if conf.modelType = 'SphereFace':
+        if conf.modelType == 'SphereFace':
             print('>>>> Loading Sphereface weights')
             self.model.load_state_dict(torch.load(save_path/'sphere20a_20171020.pth'), strict=strict)
         else:
@@ -542,7 +542,10 @@ class face_learner(object):
 
                 # Part1: FR
                 embeddings, grid_feats = self.model(imgs)
-                thetas = self.head(embeddings, labels)
+                if conf.modelType == 'SphereFace':
+                    thetas = self.head(embeddings)
+                else:
+                    thetas = self.head(embeddings, labels)
                 loss1 = self.loss_fr(thetas, labels)
 
                 # Part2: xCos

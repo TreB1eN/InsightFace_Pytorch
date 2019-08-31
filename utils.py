@@ -38,6 +38,8 @@ def separate_bn_paras(modules):
     for layer in modules:
         if 'model' in str(layer.__class__):
             continue
+        if 'net_sphere' in str(layer.__class__):
+            continue
         if 'container' in str(layer.__class__):
             continue
         else:
@@ -47,9 +49,10 @@ def separate_bn_paras(modules):
                 paras_wo_bn.extend([*layer.parameters()])
     return paras_only_bn, paras_wo_bn
 
-def prepare_facebank(conf, model, mtcnn, tta = True):
+
+def prepare_facebank(conf, model, mtcnn, tta=True):
     model.eval()
-    embeddings =  []
+    embeddings = []
     names = ['Unknown']
     for path in conf.facebank_path.iterdir():
         if path.is_file():

@@ -85,8 +85,7 @@ class AngleLoss(nn.Module):
         output = cos_theta * 1.0 #size=(B,Classnum)
         output[index] -= cos_theta[index]*(1.0+0)/(1+self.lamb)
         output[index] += phi_theta[index]*(1.0+0)/(1+self.lamb)
-
-        logpt = F.log_softmax(output)
+        logpt = F.log_softmax(output, dim=1)
         logpt = logpt.gather(1,target)
         logpt = logpt.view(-1)
         pt = Variable(logpt.data.exp())
@@ -101,6 +100,7 @@ class sphere20a(nn.Module):
     def __init__(self,classnum=10574, returnGrid=False):
         super(sphere20a, self).__init__()
         self.classnum = classnum
+        self.returnGrid = returnGrid
         #input = B*3*112*96
         self.conv1_1 = nn.Conv2d(3,64,3,2,1) #=>B*64*56*48
         self.relu1_1 = nn.PReLU(64)
@@ -156,8 +156,6 @@ class sphere20a(nn.Module):
         self.conv1x1 = nn.Sequential(nn.Conv2d(512, 32, (1, 1), 1, 0),
                                      nn.BatchNorm2d(32),
                                      nn.PReLU(32))
-        # TODO: construct type
-        # self.fc6 = eyeTypeLinear(512,self.classnum=20)
 
     def forward(self, x):
         x = self.relu1_1(self.conv1_1(x))
@@ -177,8 +175,8 @@ class sphere20a(nn.Module):
         # pass the feature into 1x1 conv
         x = self.conv1x1(x)
         grid_feat = x
-        x = x.view(x.size(0), -1)
-        x = self.fc5(x)
+        x = x.flatten(1)
+        # x = self.fc5(x)
         if self.returnGrid:
             return x, grid_feat
         # x = self.fc6(x)
