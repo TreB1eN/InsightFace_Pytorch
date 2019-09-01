@@ -32,6 +32,7 @@ def run_first_stage(image, net, scale, threshold):
 
     img = torch.FloatTensor(_preprocess(img)).to(device)
     with torch.no_grad():
+        net = net.to(img.device)
         output = net(img)
         probs = output[1].cpu().data.numpy()[0, 1, :, :]
         offsets = output[0].cpu().data.numpy()

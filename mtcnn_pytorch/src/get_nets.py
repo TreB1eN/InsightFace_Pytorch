@@ -1,3 +1,4 @@
+import os.path as op
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -52,7 +53,8 @@ class PNet(nn.Module):
         self.conv4_1 = nn.Conv2d(32, 2, 1, 1)
         self.conv4_2 = nn.Conv2d(32, 4, 1, 1)
 
-        weights = np.load('mtcnn_pytorch/src/weights/pnet.npy')[()]
+        weights = np.load(op.join(op.dirname(__file__), 'weights/pnet.npy'),
+                          allow_pickle=True)[()]
         for n, p in self.named_parameters():
             p.data = torch.FloatTensor(weights[n])
 
@@ -97,7 +99,8 @@ class RNet(nn.Module):
         self.conv5_1 = nn.Linear(128, 2)
         self.conv5_2 = nn.Linear(128, 4)
 
-        weights = np.load('mtcnn_pytorch/src/weights/rnet.npy')[()]
+        weights = np.load(op.join(op.dirname(__file__), 'weights/rnet.npy'),
+                          allow_pickle=True)[()]
         for n, p in self.named_parameters():
             p.data = torch.FloatTensor(weights[n])
 
@@ -148,7 +151,8 @@ class ONet(nn.Module):
         self.conv6_2 = nn.Linear(256, 4)
         self.conv6_3 = nn.Linear(256, 10)
 
-        weights = np.load('mtcnn_pytorch/src/weights/onet.npy')[()]
+        weights = np.load(op.join(op.dirname(__file__), 'weights/onet.npy'),
+                          allow_pickle=True)[()]
         for n, p in self.named_parameters():
             p.data = torch.FloatTensor(weights[n])
 
