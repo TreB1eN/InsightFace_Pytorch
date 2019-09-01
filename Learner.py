@@ -40,6 +40,14 @@ class face_learner(object):
                                                  conf.net_depth))
             self.head = Arcface(embedding_size=conf.embedding_size, classnum=self.class_num).to(conf.device)
             self.loss_fr = CrossEntropyLoss()
+        elif conf.modelType == 'CosFace':
+            self.model = Backbone_FC2Conv(conf.net_depth,
+                                          conf.drop_ratio,
+                                          conf.net_mode).to(conf.device)
+            print('{}_{} model generated'.format(conf.net_mode,
+                                                 conf.net_depth))
+            self.head = Am_softmax(embedding_size=conf.embedding_size, classnum=self.class_num).to(conf.device)
+            self.loss_fr = CrossEntropyLoss()
         elif conf.modelType == 'SphereFace':
             self.model = sphere20a(returnGrid=True).to(conf.device)
             self.head = AngleLinear(conf.embedding_size, self.class_num).to(conf.device)
