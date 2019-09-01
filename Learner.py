@@ -28,7 +28,6 @@ class face_learner(object):
     def __init__(self, conf, inference=False):
         print(conf)
         self.conf = conf
-        self.loader, self.class_num = get_train_loader(conf)
         if conf.use_mobilfacenet:
             self.model = MobileFaceNet(conf.embedding_size).to(conf.device)
             print('MobileFaceNet model generated')
@@ -38,42 +37,51 @@ class face_learner(object):
                                           conf.net_mode).to(conf.device)
             print('{}_{} model generated'.format(conf.net_mode,
                                                  conf.net_depth))
-            self.head = Arcface(embedding_size=conf.embedding_size, classnum=self.class_num).to(conf.device)
-            self.loss_fr = CrossEntropyLoss()
         elif conf.modelType == 'CosFace':
             self.model = Backbone_FC2Conv(conf.net_depth,
                                           conf.drop_ratio,
                                           conf.net_mode).to(conf.device)
             print('{}_{} model generated'.format(conf.net_mode,
                                                  conf.net_depth))
-            self.head = Am_softmax(embedding_size=conf.embedding_size, classnum=self.class_num).to(conf.device)
-            self.loss_fr = CrossEntropyLoss()
         elif conf.modelType == 'SphereFace':
             self.model = sphere20a(returnGrid=True).to(conf.device)
-            self.head = AngleLinear(conf.embedding_size, self.class_num).to(conf.device)
-            self.loss_fr = AngleLoss()
             print('>>> SphereFace model is generated.')
 
         # Attention Model
         self.model_attention = AttentionXCosNet(conf).to(conf.device)
         self.xCos_loss_with_attention = CosAttentionLoss()
+        # Create model_gt for cos_gt generation
+        self.model_tgt = Backbone(conf.net_depth,
+                                  conf.drop_ratio, conf.net_mode)
+        self.model_tgt = self.model_tgt.to(conf.device)
+        self.model_tgt.load_state_dict(torch.load(conf.save_path/'model_{}'
+                                       .format(conf.pretrainedMdl)))
+        self.model_tgt = self.model_tgt.eval()
 
         if inference:
             self.threshold = conf.threshold
             self.threshold_xCos = conf.threshold_xCos
         else:  # Training mode
-            # Create model_gt for cos_gt generation
-            self.model_tgt = Backbone(conf.net_depth,
-                                      conf.drop_ratio, conf.net_mode)
-            self.model_tgt = self.model_tgt.to(conf.device)
-            self.model_tgt.load_state_dict(torch.load(conf.save_path/'model_{}'
-                                           .format(conf.pretrainedMdl)))
-            self.model_tgt = self.model_tgt.eval()
-
 
             self.milestones = conf.milestones
 
-            self.writer = SummaryWriter(os.path.join(conf.log_path, conf.exp_title + '/' + conf.exp_comment))
+            self.loader, self.class_num = get_train_loader(conf)
+            if conf.modelType == 'ArcFace':
+                self.head = Arcface(embedding_size=conf.embedding_size,
+                                    classnum=self.class_num).to(conf.device)
+                self.loss_fr = CrossEntropyLoss()
+            elif conf.modelType == 'CosFace':
+                self.head = Am_softmax(embedding_size=conf.embedding_size,
+                                       classnum=self.class_num).to(conf.device)
+                self.loss_fr = CrossEntropyLoss()
+            elif conf.modelType == 'SphereFace':
+                self.head = AngleLinear(conf.embedding_size,
+                                        self.class_num).to(conf.device)
+                self.loss_fr = AngleLoss()
+
+            self.writer = SummaryWriter(os.path.join(conf.log_path,
+                                        conf.exp_title + '/' +
+                                        conf.exp_comment))
             self.step = 0
 
             print('two model heads generated')
@@ -120,6 +128,22 @@ class face_learner(object):
             half_idx = feats.size(0) // 2
             feat1 = feats[:half_idx]
             feat2 = feats[half_idx:]
+            feat1 = l2normalize(feat1)
+            feat2 = l2normalize(feat2)
+            cosine = cosineDim1(feat1, feat2)
+            return cosine
+
+    def getCosFrom2Imgs(self, img1s, img2s):
+        '''
+        img1s: tensor of size (conf.bs//2, 3, 112, 112)
+        img2s: tensor of size (conf.bs//2, 3, 112, 112)
+        feat1: tensor of size [conf.bs//2, 512]
+        feat2: tensor of size [conf.bs//2, 512]
+        cosine:tensor of size (bs//2,)
+        '''
+        with torch.no_grad():
+            feat1 = self.model_tgt(img1s)
+            feat2 = self.model_tgt(img2s)
             feat1 = l2normalize(feat1)
             feat2 = l2normalize(feat2)
             cosine = cosineDim1(feat1, feat2)
@@ -255,12 +279,17 @@ class face_learner(object):
                 return xCos, attention, cos_patched
 
             def batch2XCosAndGtCos(batch, attention, conf, tta):
+                '''
+                batch: tensor of size (bs, 3, 112, 112) A[0::2] B[1::2]
+                '''
                 femb_bat, emb_batch = batch2feat(batch, conf, tta)
 
                 xCos, attentionMap, cos_patched = computeXCosWithAttention(
                         emb_batch, attention)
                 # XXX
-                gtCos = cosineDim1(femb_bat[0::2], femb_bat[1::2])
+                # gtCos = cosineDim1(femb_bat[0::2], femb_bat[1::2])
+                gtCos = self.getCosFrom2Imgs(batch[0::2].to(conf.device),
+                                             batch[1::2].to(conf.device))
                 # Store batch to xCos matrix
                 xCos = xCos.cpu().numpy()
                 gtCos = gtCos.cpu().numpy()
@@ -431,7 +460,7 @@ class face_learner(object):
         texts = annotate_heatmap(im, valfmt="{x:.2f}")
         # axs[3].imshpw(cos_patch)
         # axs[4].imshow(weight_attention)
-        plt.show()
+        # plt.show()
         img_name = exPath + '/' + title_str + \
             "_COS_%5.4f_xCos_%5.4f" % (float(cos_fr), cos_x) + '.png'
         plt.savefig(img_name, bbox_inches='tight')
