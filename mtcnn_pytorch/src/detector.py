@@ -53,7 +53,7 @@ def detect_faces(image, min_face_size=20.0,
 
     # it will be returned
     bounding_boxes = []
-    
+
     with torch.no_grad():
         # run P-Net on different scales
         for s in scales:
@@ -62,6 +62,8 @@ def detect_faces(image, min_face_size=20.0,
 
         # collect boxes (and offsets, and scores) from different scales
         bounding_boxes = [i for i in bounding_boxes if i is not None]
+        if len(bounding_boxes) == 0:
+            return [], []
         bounding_boxes = np.vstack(bounding_boxes)
 
         keep = nms(bounding_boxes[:, 0:5], nms_thresholds[0])
@@ -97,7 +99,7 @@ def detect_faces(image, min_face_size=20.0,
         # STAGE 3
 
         img_boxes = get_image_boxes(bounding_boxes, image, size=48)
-        if len(img_boxes) == 0: 
+        if len(img_boxes) == 0:
             return [], []
         img_boxes = torch.FloatTensor(img_boxes)
         output = onet(img_boxes)

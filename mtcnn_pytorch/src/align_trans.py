@@ -9,7 +9,7 @@ import cv2
 # from scipy.linalg import lstsq
 # from scipy.ndimage import geometric_transform  # , map_coordinates
 
-from mtcnn_pytorch.src.matlab_cp2tform import get_similarity_transform_for_cv2
+from .matlab_cp2tform import get_similarity_transform_for_cv2
 
 # reference facial points, a list of coordinates (x,y)
 REFERENCE_FACIAL_POINTS = [
@@ -38,9 +38,9 @@ def get_reference_facial_points(output_size=None,
     ----------
         get reference 5 key points according to crop settings:
         0. Set default crop_size:
-            if default_square: 
+            if default_square:
                 crop_size = (112, 112)
-            else: 
+            else:
                 crop_size = (96, 112)
         1. Pad the crop_size by inner_padding_factor in each side;
         2. Resize crop_size into (output_size - outer_padding*2),
@@ -60,7 +60,7 @@ def get_reference_facial_points(output_size=None,
             else:
                 default crop_size = (96, 112);
         !!! make sure, if output_size is not None:
-                (output_size - outer_padding) 
+                (output_size - outer_padding)
                 = some_scale * (default crop_size * (1.0 + inner_padding_factor))
     Returns:
     ----------
@@ -246,10 +246,10 @@ def warp_and_crop_face(src_img,
     """
 
     if reference_pts is None:
-        if crop_size[0] == 96 and crop_size[1] == 112:
+        if crop_size is not None and crop_size[0] == 96 and crop_size[1] == 112:
             reference_pts = REFERENCE_FACIAL_POINTS
         else:
-            default_square = False
+            default_square = True
             inner_padding_factor = 0
             outer_padding = (0, 0)
             output_size = crop_size
