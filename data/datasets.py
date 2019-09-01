@@ -824,8 +824,28 @@ class IJBCVerificationPathDataset(IJBCVerificationBaseDataset):
         super().__init__(ijbc_data_root)
         self.occlusion_lower_bound = occlusion_lower_bound
 
+    def _filter_out_occlusion_insufficient_entries(self, entries):
+        out = []
+        for entry in entries:
+            tmp_df = self.metadata[self.metadata['SUBJECT_ID'] == entry['SUBJECT_ID']]
+            entry_meta_data = tmp_df['FILENAME'] == entry['FILENAME']
+            assert len(entry_meta_data) == 1
+            occlusion_count = entry_meta_data[[f'OCC{i}' for i in range(1, 19)]].values.sum()
+            if occlusion_count >= self.occlusion_lower_bound:
+                out.append(entry)
+        return out
+
     def __getitem__(self, idx):
         enroll_entries, verif_entries = self._get_both_entries(idx)
+        enroll_entries = self._filter_out_occlusion_insufficient_entries(enroll_entries)
+        verif_entries = self._filter_out_occlusion_insufficient_entries(verif_entries)
+
+        def path_suffixes(entries):
+            return [self._get_cropped_path_suffix(entry) for entry in entries]
+        return {
+            "enroll_path_suffixes": path_suffixes(enroll_entries),
+            "verif_path_suffixes": path_suffixes(verif_entries),
+        }
 
 
 class IJBCAllCroppedFacesDataset(Dataset):
