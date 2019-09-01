@@ -739,7 +739,11 @@ class CArrayDataset(Dataset):
         return len(self.carray)
 
 
-class IJBCVerificationDataset(Dataset):
+class IJBCVerificationBaseDataset(Dataset):
+    """
+        Base class of IJB-C verification dataset to read neccesary
+        csv files and provide general functions.
+    """
     def __init__(self, ijbc_data_root):
         # read all csvs neccesary for verification
         self.ijbc_data_root = ijbc_data_root
@@ -749,6 +753,37 @@ class IJBCVerificationDataset(Dataset):
         self.verif_templates = pd.read_csv(op.join(test1_dir, 'verif_templates.csv'))
         self.match = pd.read_csv(op.join(test1_dir, 'match.csv'))
 
+    def _get_both_entries(self, idx):
+        enroll_tid = self.match.iloc[idx]['ENROLL_TEMPLATE_ID']
+        verif_tid = self.match.iloc[idx]['VERIF_TEMPLATE_ID']
+        enroll_entries = self.enroll_templates[self.enroll_templates.TEMPLATE_ID == enroll_tid]
+        verif_entries = self.verif_templates[self.verif_templates.TEMPLATE_ID == verif_tid]
+        return enroll_entries, verif_entries
+
+    def _get_cropped_path_suffix(self, entry):
+        sid = entry['SUBJECT_ID']
+        filepath = entry['FILENAME']
+        img_or_frames, fname = op.split(filepath)
+        fname_index, _ = op.splitext(fname)
+        cropped_path_suffix = op.join(img_or_frames, f'{sid}_{fname_index}.jpg')
+        return cropped_path_suffix
+
+    def __len__(self):
+        return len(self.match)
+
+
+class IJBCVerificationDataset(IJBCVerificationBaseDataset):
+    """
+        IJB-C verification dataset (`test1` in the folder) who transforms
+        the cropped faces into tensors.
+
+        Note that entries in this verification dataset contains lots of
+        repeated faces. A better way to evaluate a model's score is to
+        precompute all faces features and store them into disks. (
+        see `IJBCAllCroppedFacesDataset` and `IJBCVerificationPathDataset`)
+    """
+    def __init__(self, ijbc_data_root):
+        super().__init__(ijbc_data_root)
         self.transforms = transforms.Compose([
             transforms.Resize([112, 112]),
             transforms.ToTensor(),
@@ -756,11 +791,8 @@ class IJBCVerificationDataset(Dataset):
         ])
 
     def _get_cropped_face_image_by_entry(self, entry):
-        sid = entry['SUBJECT_ID']
-        filepath = entry['FILENAME']
-        img_or_frames, fname = op.split(filepath)
-        fname_index, _ = op.splitext(fname)
-        cropped_path = op.join(self.ijbc_data_root, 'cropped_faces', img_or_frames, f'{sid}_{fname_index}.jpg')
+        cropped_path_suffix = self._get_cropped_path_suffix(entry)
+        cropped_path = op.join(self.ijbc_data_root, 'cropped_faces', cropped_path_suffix)
         return Image.open(cropped_path)
 
     def _get_tensor_by_entries(self, entries):
@@ -769,21 +801,69 @@ class IJBCVerificationDataset(Dataset):
         return torch.stack(faces_tensors, dim=0)
 
     def __getitem__(self, idx):
-        enroll_tid = self.match.iloc[idx]['ENROLL_TEMPLATE_ID']
-        verif_tid = self.match.iloc[idx]['VERIF_TEMPLATE_ID']
-        enroll_entries = self.enroll_templates[self.enroll_templates.TEMPLATE_ID == enroll_tid]
-        verif_entries = self.verif_templates[self.verif_templates.TEMPLATE_ID == verif_tid]
-
+        enroll_entries, verif_entries = self._get_both_entries(idx)
         enroll_faces_tensor = self._get_tensor_by_entries(enroll_entries)
         verif_faces_tensor = self._get_tensor_by_entries(verif_entries)
-
         return {
             "enroll_faces_tensor": enroll_faces_tensor,
             "verif_faces_tensor": verif_faces_tensor
         }
 
+
+class IJBCVerificationPathDataset(IJBCVerificationBaseDataset):
+    """
+        This dataset read the match file of verification set in IJB-C
+        (in the `test1` directory) and output the cropped faces' paths
+        of both enroll_template and verif_template for each match.
+
+        Models outside can use the path information to read their stored
+        features and compute the similarity score of enroll_template and
+        verif_template.
+    """
+    def __init__(self, ijbc_data_root, occlusion_lower_bound=0):
+        super().__init__(ijbc_data_root)
+        self.occlusion_lower_bound = occlusion_lower_bound
+
+    def __getitem__(self, idx):
+        enroll_entries, verif_entries = self._get_both_entries(idx)
+
+
+class IJBCAllCroppedFacesDataset(Dataset):
+    """
+        This dataset loads all faces available in IJB-C and transform
+        them into tensors. The path for that face is output along with
+        its tensor.
+        This is for models to compute all faces' features and store them
+        into disks, otherwise the verification testing set contains too many
+        repeated faces that should not be computed again and again.
+    """
+    def __init__(self, ijbc_data_root):
+        self.ijbc_data_root = ijbc_data_root
+        self.transforms = transforms.Compose([
+            transforms.Resize([112, 112]),
+            transforms.ToTensor(),
+            transforms.Normalize([.5, .5, .5], [.5, .5, .5]),
+        ])
+        self.all_cropped_paths_img = sorted(glob(
+            op.join(self.ijbc_data_root, 'cropped_faces', 'img', '*.jpg')))
+        self.len_set1 = len(self.all_cropped_paths_img)
+        self.all_cropped_paths_frames = sorted(glob(
+            op.join(self.ijbc_data_root, 'cropped_faces', 'frames', '*.jpg')))
+
+    def __getitem__(self, idx):
+        if idx < self.len_set1:
+            path = self.all_cropped_paths_img[idx]
+        else:
+            path = self.all_cropped_paths_frames[idx - self.len_set1]
+        img = Image.open(path).convert('RGB')
+        tensor = self.transforms(img)
+        return {
+            "tensor": tensor,
+            "path": path,
+        }
+
     def __len__(self):
-        return len(self.match)
+        return len(self.all_cropped_paths_frames) + len(self.all_cropped_paths_img)
 
 
 class ARverificationDataset(Dataset):
