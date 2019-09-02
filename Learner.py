@@ -363,6 +363,44 @@ class face_learner(object):
         corrPlot_tensor = trans.ToTensor()(corrPlot)
         return corrPlot_tensor
 
+    def plot_CorrBtwPatchCosAndGtCos(self, conf, carray, issame,
+                                     nrof_folds=5, tta=False, attention=None):
+        '''
+        carray: list (2 * # of pairs, 3, 112, 112)
+        issame: list (# of pairs,)
+        emb_batch: tensor [bs, 32, 7, 7]
+        xCoses: list (# of pairs,)
+        attention: GPUtorch.FloatTensor((bs//2, 1, 7, 7)),is ones/sum() or corr
+        '''
+        def getCorr(s_matrix, vec):
+            _, h, w = s_matrix.shape
+            result = np.zeros((h, w))
+            for i in range(h):
+                for j in range(w):
+                    result[i][j] = np.corrcoef(s_matrix[:, i, j], vec)[0, 1]
+            return result
+        xCoses, gtCoses, attentionMaps, cosPatchedMaps = self.getXCos(
+                carray, conf, tta=tta, attention=attention, returnXCAP=True)
+        # Calculate the correlation
+        corr_result = getCorr(cosPatchedMaps, gtCoses)
+        print(corr_result)
+        # plt.matshow(corr_result)
+        fig, ax = plt.subplots()
+
+        im, cbar = heatmap(corr_result, [], [], ax=ax,
+                                   cmap="YlGn", cbarlabel="correlation with GAP feat")
+        texts = annotate_heatmap(im, valfmt="{x:.3f}")
+
+        fig.tight_layout()
+        plt.show()
+        plt.gcf().clear()
+
+        title = 'xCos vs Cos on lfw 6000 pairs'
+        buf = plot_scatter(xCoses, gtCoses, title, 'xCos', 'Cos')
+        corrPlot = Image.open(buf)
+        corrPlot_tensor = trans.ToTensor()(corrPlot)
+        return corrPlot_tensor
+
     def plot_Examples(self, conf, carray, issame,
                       nrof_folds=5, tta=False, attention=None,
                       exDir='defaultExamples'):
