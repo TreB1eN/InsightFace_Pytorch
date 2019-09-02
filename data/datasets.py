@@ -826,9 +826,10 @@ class IJBCVerificationPathDataset(IJBCVerificationBaseDataset):
 
     def _filter_out_occlusion_insufficient_entries(self, entries):
         out = []
-        for entry in entries:
+        for _, entry in entries.iterrows():
             tmp_df = self.metadata[self.metadata['SUBJECT_ID'] == entry['SUBJECT_ID']]
-            entry_meta_data = tmp_df['FILENAME'] == entry['FILENAME']
+            entry_meta_data = tmp_df[tmp_df['FILENAME'] == entry['FILENAME']]
+
             assert len(entry_meta_data) == 1
             occlusion_count = entry_meta_data[[f'OCC{i}' for i in range(1, 19)]].values.sum()
             if occlusion_count >= self.occlusion_lower_bound:
@@ -837,6 +838,10 @@ class IJBCVerificationPathDataset(IJBCVerificationBaseDataset):
 
     def __getitem__(self, idx):
         enroll_entries, verif_entries = self._get_both_entries(idx)
+
+        is_same = (enroll_entries['SUBJECT_ID'].iloc[0] == verif_entries['SUBJECT_ID'].iloc[0])
+        is_same = 1 if is_same else 0
+
         enroll_entries = self._filter_out_occlusion_insufficient_entries(enroll_entries)
         verif_entries = self._filter_out_occlusion_insufficient_entries(verif_entries)
 
@@ -845,6 +850,7 @@ class IJBCVerificationPathDataset(IJBCVerificationBaseDataset):
         return {
             "enroll_path_suffixes": path_suffixes(enroll_entries),
             "verif_path_suffixes": path_suffixes(verif_entries),
+            "is_same": is_same
         }
 
 
@@ -886,32 +892,32 @@ class IJBCAllCroppedFacesDataset(Dataset):
         return len(self.all_cropped_paths_frames) + len(self.all_cropped_paths_img)
 
 
-class ARverificationDataset(Dataset):
+class ARVerificationAllPathDataset(Dataset):
     '/tmp3/biolin/datasets/face/ARFace/test2'
-    def __init__(self, dataset_root='/tmp3/biolin/datasets/face/ARFace/test2',
-                 sampled_num=12000, used_condition=('08', '11', '21', '24')):
-        '''
-        Dataset to generate 6000 positive and 6000 negative samples from AR dataset.
-        Following the evaluation process of paper "Towards Interpretable Face Recognition", only
-        faces with eye glasses or scarfs are used (corresponding to our default `used_condition`).
-
-        But we only found 400 satisfied images on AR `test2` directory, which is different from
-        that 810 images claimed by the paper.
-        '''
-        self.sampled_num = sampled_num
-        self.used_condition = used_condition
+    def __init__(self, dataset_root='/tmp2/zhe2325138/dataset/ARFace/mtcnn_aligned_and_cropped/'):
         self.dataset_root = dataset_root
+        self.face_image_paths = sorted(glob(op.join(self.dataset_root, '*.png')))
+
+        self.transforms = transforms.Compose([
+            transforms.Resize([112, 112]),
+            transforms.ToTensor(),
+            transforms.Normalize([.5, .5, .5], [.5, .5, .5]),
+        ])
 
     def __getitem__(self, idx):
-        if idx % 2 == 0:
-            positive = True
-            pass
-        else:
-            positive = False
-            pass
+        fpath = self.face_image_paths[idx]
+        fname, _ = op.splitext(op.basename(fpath))
+
+        image = Image.open(fpath)
+        image_tensor = self.transforms(image)
+        return {
+            'image_tensor': image_tensor,
+            'fname': fname
+        }
 
     def __len__(self):
-        return sampled_num
+        return len(self.face_image_paths)
+
 
 if __name__ == "__main__":
     with torch.no_grad():

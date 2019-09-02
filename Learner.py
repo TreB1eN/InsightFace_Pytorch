@@ -153,6 +153,17 @@ class face_learner(object):
 #         self.writer.add_scalar('{}_val_std'.format(db_name), val_std, self.step)
 #         self.writer.add_scalar('{}_far:False Acceptance Ratio'.format(db_name), far, self.step)
 
+    def get_x_cosine(self, grid_feat1, grid_feat2, attention=None):
+        if attention is None:
+            # Size of attention: (bs//2, 1, 7, 7)
+            attention = self.model_attention(grid_feat1, grid_feat2)
+        # Size of xCos: (bs//2,)
+        xCos, cos_patched = self.attention_loss.computeXCos(
+                grid_feat1, grid_feat2, attention,
+                returnCosPatched=True)
+        attention = torch.squeeze(attention.permute(0, 2, 3, 1))
+        return xCos, attention, cos_patched
+
     def evaluate(self, conf, carray, issame, nrof_folds = 5, tta = False):
         '''
         carray: list (2 * # of pairs, 3, 112, 112)
