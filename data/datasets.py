@@ -744,14 +744,23 @@ class IJBCVerificationBaseDataset(Dataset):
         Base class of IJB-C verification dataset to read neccesary
         csv files and provide general functions.
     """
-    def __init__(self, ijbc_data_root):
+    def __init__(self, ijbc_data_root, leave_ratio=1.0):
         # read all csvs neccesary for verification
         self.ijbc_data_root = ijbc_data_root
-        self.metadata = pd.read_csv(op.join(ijbc_data_root, 'protocols', 'ijbc_metadata_with_age.csv'))
+        dtype_sid_tid = {'SUBJECT_ID': str, 'TEMPLATE_ID': str}
+        self.metadata = pd.read_csv(op.join(ijbc_data_root, 'protocols', 'ijbc_metadata_with_age.csv'),
+                                    dtype=dtype_sid_tid)
         test1_dir = op.join(ijbc_data_root, 'protocols', 'test1')
-        self.enroll_templates = pd.read_csv(op.join(test1_dir, 'enroll_templates.csv'))
-        self.verif_templates = pd.read_csv(op.join(test1_dir, 'verif_templates.csv'))
-        self.match = pd.read_csv(op.join(test1_dir, 'match.csv'))
+        self.enroll_templates = pd.read_csv(op.join(test1_dir, 'enroll_templates.csv'), dtype=dtype_sid_tid)
+        self.verif_templates = pd.read_csv(op.join(test1_dir, 'verif_templates.csv'), dtype=dtype_sid_tid)
+        self.match = pd.read_csv(op.join(test1_dir, 'match.csv'), dtype=str)
+
+        if leave_ratio < 1.0:  # shrink the number of verified pairs
+            indice = np.arange(len(self.match))
+            np.random.seed(0)
+            np.random.shuffle(indice)
+            left_number = int(len(self.match) * leave_ratio)
+            self.match = self.match.iloc[indice[:left_number]]
 
     def _get_both_entries(self, idx):
         enroll_tid = self.match.iloc[idx]['ENROLL_TEMPLATE_ID']
@@ -820,19 +829,20 @@ class IJBCVerificationPathDataset(IJBCVerificationBaseDataset):
         features and compute the similarity score of enroll_template and
         verif_template.
     """
-    def __init__(self, ijbc_data_root, occlusion_lower_bound=0):
-        super().__init__(ijbc_data_root)
+    def __init__(self, ijbc_data_root, occlusion_lower_bound=0, leave_ratio=1.0):
+        super().__init__(ijbc_data_root, leave_ratio=leave_ratio)
         self.occlusion_lower_bound = occlusion_lower_bound
+        self.metadata['OCC_sum'] = self.metadata[[f'OCC{i}' for i in range(1, 19)]].sum(axis=1)
+        self.reindexed_meta = self.metadata.set_index(['SUBJECT_ID', 'FILENAME'])
 
     def _filter_out_occlusion_insufficient_entries(self, entries):
+        if self.occlusion_lower_bound == 0:
+            return [entry for _, entry in entries.iterrows()]
+
         out = []
         for _, entry in entries.iterrows():
-            tmp_df = self.metadata[self.metadata['SUBJECT_ID'] == entry['SUBJECT_ID']]
-            entry_meta_data = tmp_df[tmp_df['FILENAME'] == entry['FILENAME']]
-
-            assert len(entry_meta_data) == 1
-            occlusion_count = entry_meta_data[[f'OCC{i}' for i in range(1, 19)]].values.sum()
-            if occlusion_count >= self.occlusion_lower_bound:
+            occlusion_sum = self.reindexed_meta.loc[(entry['SUBJECT_ID'], entry['FILENAME']), 'OCC_sum']
+            if occlusion_sum.values[0] >= self.occlusion_lower_bound:
                 out.append(entry)
         return out
 
@@ -841,6 +851,8 @@ class IJBCVerificationPathDataset(IJBCVerificationBaseDataset):
 
         is_same = (enroll_entries['SUBJECT_ID'].iloc[0] == verif_entries['SUBJECT_ID'].iloc[0])
         is_same = 1 if is_same else 0
+        enroll_template_id = enroll_entries['TEMPLATE_ID'].iloc[0],
+        verif_template_id = verif_entries['TEMPLATE_ID'].iloc[0],
 
         enroll_entries = self._filter_out_occlusion_insufficient_entries(enroll_entries)
         verif_entries = self._filter_out_occlusion_insufficient_entries(verif_entries)
@@ -848,6 +860,8 @@ class IJBCVerificationPathDataset(IJBCVerificationBaseDataset):
         def path_suffixes(entries):
             return [self._get_cropped_path_suffix(entry) for entry in entries]
         return {
+            "enroll_template_id": enroll_template_id,
+            "verif_template_id": verif_template_id,
             "enroll_path_suffixes": path_suffixes(enroll_entries),
             "verif_path_suffixes": path_suffixes(verif_entries),
             "is_same": is_same
@@ -890,6 +904,104 @@ class IJBCAllCroppedFacesDataset(Dataset):
 
     def __len__(self):
         return len(self.all_cropped_paths_frames) + len(self.all_cropped_paths_img)
+
+
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+def make_square_box(box):
+    width = box[2] - box[0]
+    height = box[3] - box[1]
+    if width > height:
+        diff = width - height
+        box[1] -= diff // 2
+        box[3] += diff // 2
+    elif height > width:
+        diff = height - width
+        box[0] -= diff // 2
+        box[2] += diff // 2
+    return box
+
+
+class IJBAVerificationDataset(Dataset):
+    def __init__(self, ijba_data_root='/tmp3/zhe2325138/IJB/IJB-A/', split_name='split1',
+                 only_first_image=False, aligned_facial_3points=False):
+        self.ijba_data_root = ijba_data_root
+        split_root = op.join(ijba_data_root, 'IJB-A_11_sets', split_name)
+        self.only_first_image = only_first_image
+
+        self.metadata = pd.read_csv(op.join(split_root, 'verify_metadata_1.csv'))
+        self.metadata = self.metadata.set_index('TEMPLATE_ID')
+        self.comparisons = pd.read_csv(op.join(split_root, 'verify_comparisons_1.csv'), header=None)
+
+        self.transform = transforms.Compose([
+            transforms.Resize([112, 112]),
+            transforms.ToTensor(),
+            transforms.Normalize([.5, .5, .5], [.5, .5, .5]),
+        ])
+
+        self.aligned_facial_3points = aligned_facial_3points
+        self.src_facial_3_points = self._get_source_facial_3points()
+
+    def _get_source_facial_3points(self, output_size=(112, 112)):
+        # set source landmarks based on 96x112 size
+        src = np.array([
+           [30.2946, 51.6963],  # left eye
+           [65.5318, 51.5014],  # right eye
+           [48.0252, 71.7366],  # nose
+           # [33.5493, 92.3655],  # left mouth
+           # [62.7299, 92.2041],  # right mouth
+        ], dtype=np.float32)
+
+        # scale landmarkS to match output size
+        src[:, 0] *= (output_size[0] / 96)
+        src[:, 1] *= (output_size[1] / 112)
+        return src
+
+    def _get_face_img_from_entry(self, entry, square=True):
+        fname = entry["FILE"]
+        if fname[:5] == 'frame':
+            fname = 'frames' + fname[5:]  # to fix error in annotation =_=
+        img = Image.open(op.join(self.ijba_data_root, 'images', fname)).convert('RGB')
+
+        if self.aligned_facial_3points:
+            raise NotImplementedError
+        else:
+            face_box = [entry['FACE_X'], entry['FACE_Y'], entry['FACE_X'] + entry['FACE_WIDTH'],
+                        entry['FACE_Y'] + entry['FACE_HEIGHT']]  # left, upper, right, lower
+            face_box = make_square_box(face_box) if square else face_box
+            face_img = img.crop(face_box)
+        return face_img
+
+    def _get_tensor_from_entries(self, entries):
+        imgs = [self._get_face_img_from_entry(entry) for _, entry in entries.iterrows()]
+        tensors = torch.stack([
+            self.transform(img) for img in imgs
+        ])
+        return tensors
+
+    def __getitem__(self, idx):
+        t1, t2 = self.comparisons.iloc[idx]
+        t1_entries, t2_entries = self.metadata.loc[[t1]], self.metadata.loc[[t2]]
+        if self.only_first_image:
+            t1_entries, t2_entries = t1_entries.iloc[:1], t2_entries.iloc[:1]
+
+        t1_tensors = self._get_tensor_from_entries(t1_entries)
+        t2_tensors = self._get_tensor_from_entries(t2_entries)
+        if self.only_first_image:
+            t1_tensors, t2_tensors = t1_tensors.squeeze(0), t2_tensors.squeeze(0)
+
+        s1, s2 = t1_entries['SUBJECT_ID'].iloc[0], t2_entries['SUBJECT_ID'].iloc[0]
+        is_same = 1 if (s1 == s2) else 0
+        return {
+            "comparison_idx": idx,
+            "t1_tensors": t1_tensors,
+            "t2_tensors": t2_tensors,
+            "is_same": is_same,
+        }
+
+    def __len__(self):
+        return len(self.comparisons)
 
 
 class ARVerificationAllPathDataset(Dataset):
