@@ -383,7 +383,6 @@ class face_learner(object):
                 carray, conf, tta=tta, attention=attention, returnXCAP=True)
         # Calculate the correlation
         corr_result = getCorr(cosPatchedMaps, gtCoses)
-        print(corr_result)
         # plt.matshow(corr_result)
         fig, ax = plt.subplots()
 
@@ -399,7 +398,7 @@ class face_learner(object):
         buf = plot_scatter(xCoses, gtCoses, title, 'xCos', 'Cos')
         corrPlot = Image.open(buf)
         corrPlot_tensor = trans.ToTensor()(corrPlot)
-        return corrPlot_tensor
+        return corrPlot_tensor, corr_result
 
     def plot_Examples(self, conf, carray, issame,
                       nrof_folds=5, tta=False, attention=None,
@@ -468,22 +467,31 @@ class face_learner(object):
         axs[2].set_title(r'$cos_{patch}$', y=-0.1)
         axs[3].set_title(r'$weight_{attetion}$', y=-0.1)
 
-        def drawGridLines(image_t, w_lines=5, h_lines=6):
+        def drawGridLines(image_t, w_lines=5, h_lines=6,
+                          colorRGB=(128, 128, 128)):
+            '''
+            colorRGB: default: gray(128, 128, 128), you can use red(255, 0, 0)
+            '''
+            colorRGB = (255, 0, 0)
+            w_lines += 1
+            h_lines += 1
             h, w, _ = image_t.shape
             w_unit = int(w // w_lines)
-            w_start = int(w_unit // 2)
+            # w_start = int(w_unit // 2)
+            w_start = w_unit
             h_unit = int(h // h_lines)
-            h_start = int(h_unit // 2)
+            # h_start = int(h_unit // 2)
+            h_start = h_unit
             # Draw vertical grid lines
             for step in range(w_lines):
                 start_pt = (w_start + w_unit * step, 0)
                 end_pt = (w_start + w_unit * step, h)
-                cv2.line(image_t, start_pt, end_pt, (255, 0, 0), 1, 1)
+                cv2.line(image_t, start_pt, end_pt, colorRGB, 1, 1)
             # Draw horizontal grid lines
             for step in range(h_lines):
                 start_pt = (0, h_start + h_unit * step)
                 end_pt = (w, h_start + h_unit * step)
-                cv2.line(image_t, start_pt, end_pt, (255, 0, 0), 1, 1)
+                cv2.line(image_t, start_pt, end_pt, colorRGB, 1, 1)
         drawGridLines(image1, 6, 6)
         drawGridLines(image2, 6, 6)
         axs[0].imshow(image1)
@@ -491,11 +499,10 @@ class face_learner(object):
         # Show cos_patch
         im, cbar = heatmap_seaborn(cos_patch, [], [], ax=axs[2],
                            cmap="RdBu", cbarlabel=r'$cos_{patched}$', threshold=threshold)
-        # texts = annotate_heatmap(im, valfmt="{x:.2f}")
         # Show weights_attention
         im, cbar = heatmap(weight_attention, [], [], ax=axs[3],
                            cmap="YlGn", cbarlabel=r'$weight_{attetion}$')
-        texts = annotate_heatmap(im, valfmt="{x:.2f}")
+        # texts = annotate_heatmap(im, valfmt="{x:.2f}")
         # axs[3].imshpw(cos_patch)
         # axs[4].imshow(weight_attention)
         # plt.show()

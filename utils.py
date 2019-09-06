@@ -300,8 +300,7 @@ def heatmap_seaborn(data, row_labels, col_labels, ax=None,
 
     # Plot the heatmap
     g = sns.heatmap(data, ax=ax, center=threshold, vmin=-1, vmax=1,
-            cmap=cmap, cbar_kws={'label': cbarlabel},
-            annot=True, fmt=".2f")
+            cmap=cmap, cbar_kws={'label': cbarlabel})
 
     # Create colorbar
     # cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
