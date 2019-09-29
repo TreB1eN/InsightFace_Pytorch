@@ -160,27 +160,24 @@ def calculate_accuracy(threshold, dist, actual_issame, useCos=False):
 
 
 def calculate_val(thresholds, embeddings1, embeddings2, actual_issame, far_target, nrof_folds=10):
-    '''
-    Copy from [insightface](https://github.com/deepinsight/insightface)
-    :param thresholds:
-    :param embeddings1:
-    :param embeddings2:
-    :param actual_issame:
-    :param far_target:
-    :param nrof_folds:
-    :return:
-    '''
     assert (embeddings1.shape[0] == embeddings2.shape[0])
     assert (embeddings1.shape[1] == embeddings2.shape[1])
-    nrof_pairs = min(len(actual_issame), embeddings1.shape[0])
+    diff = np.subtract(embeddings1, embeddings2)
+    dist = np.sum(np.square(diff), 1)
+    return calculate_val(thresholds, dist, actual_issame, far_target, nrof_folds=nrof_folds)
+
+
+def calculate_val_by_diff(thresholds, dist, actual_issame, far_target, nrof_folds=10, ret_acc=False):
+    if thresholds == 'default':
+        thresholds = np.arange(-1.0, 1.0, 0.005)
+    nrof_pairs = min(len(actual_issame), dist.shape[0])
     nrof_thresholds = len(thresholds)
     k_fold = KFold(n_splits=nrof_folds, shuffle=False)
 
     val = np.zeros(nrof_folds)
     far = np.zeros(nrof_folds)
+    acc = np.zeros(nrof_folds)
 
-    diff = np.subtract(embeddings1, embeddings2)
-    dist = np.sum(np.square(diff), 1)
     indices = np.arange(nrof_pairs)
 
     for fold_idx, (train_set, test_set) in enumerate(k_fold.split(indices)):
@@ -195,15 +192,19 @@ def calculate_val(thresholds, embeddings1, embeddings2, actual_issame, far_targe
         else:
             threshold = 0.0
 
-        val[fold_idx], far[fold_idx] = calculate_val_far(threshold, dist[test_set], actual_issame[test_set])
+        val[fold_idx], far[fold_idx], acc[fold_idx] = calculate_val_far(
+            threshold, dist[test_set], actual_issame[test_set], ret_acc=True)
 
     val_mean = np.mean(val)
     far_mean = np.mean(far)
     val_std = np.std(val)
-    return val_mean, val_std, far_mean
+    if ret_acc:
+        return val_mean, val_std, far_mean, acc.mean(), acc.std()
+    else:
+        return val_mean, val_std, far_mean
 
 
-def calculate_val_far(threshold, dist, actual_issame):
+def calculate_val_far(threshold, dist, actual_issame, ret_acc=False):
     predict_issame = np.less(dist, threshold)
     true_accept = np.sum(np.logical_and(predict_issame, actual_issame))
     false_accept = np.sum(np.logical_and(predict_issame, np.logical_not(actual_issame)))
@@ -211,7 +212,11 @@ def calculate_val_far(threshold, dist, actual_issame):
     n_diff = np.sum(np.logical_not(actual_issame))
     val = float(true_accept) / float(n_same)
     far = float(false_accept) / float(n_diff)
-    return val, far
+    if ret_acc:
+        acc = np.sum(predict_issame == actual_issame) / float(len(predict_issame))
+        return val, far, acc
+    else:
+        return val, far
 
 
 def evaluate(embeddings, actual_issame, nrof_folds=10, pca=0):
