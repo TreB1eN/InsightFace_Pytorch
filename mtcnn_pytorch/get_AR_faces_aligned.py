@@ -32,6 +32,9 @@ def mctnn_crop_face(img, output_size=(224, 224)):
 
     # get facial points
     bounding_boxes, landmarks = detect_faces(img)
+    if len(landmarks) == 0:
+        return None
+
     dst = landmarks[0].astype(np.float32)
     facial5points = [[dst[j], dst[j + 5]] for j in range(5)]
 
@@ -47,8 +50,23 @@ def mctnn_crop_face(img, output_size=(224, 224)):
 
 
 dst_dir = '/tmp2/zhe2325138/dataset/ARFace/mtcnn_aligned_and_cropped/'
-for img_path in sorted(glob('/tmp2/zhe2325138/dataset/ARFace/png_from_raw/*.png')):
-    print(f'Processing {img_path}')
+skip_list = []
+for i, img_path in enumerate(sorted(glob('/tmp2/zhe2325138/dataset/ARFace/png_from_raw/*.png'))):
+    target_path = op.join(dst_dir, op.basename(img_path))
+    if op.exists(target_path):
+        print(f'Target path {target_path} already exists. Skipping')
+        continue
+    if i % 20 == 0:
+        print(f'Processing {img_path}')
+
     img = Image.open(img_path)
     cropped_img = mctnn_crop_face(img)
-    cropped_img.save(op.join(dst_dir, op.basename(img_path)))
+    if cropped_img is None:
+        print(f'Skipping {img_path} since no face is detected')
+        skip_list.append(img_path)
+    else:
+        cropped_img.save(target_path)
+
+with open('/tmp2/zhe2325138/dataset/ARFace/mtcnn_aligned_and_cropped/face_not_found_list.txt', 'w') as f:
+    s = '\n'.join(skip_list)
+    f.write(s)
