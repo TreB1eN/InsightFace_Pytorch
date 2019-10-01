@@ -3,3 +3,5 @@ __pycache__/
 data/__pycache__/
 data/faces_emore
 data/faces_webface_112x112/
+.ipynb_checkpoints/
+notebooks/
