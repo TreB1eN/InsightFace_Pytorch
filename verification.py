@@ -164,7 +164,7 @@ def calculate_val(thresholds, embeddings1, embeddings2, actual_issame, far_targe
     assert (embeddings1.shape[1] == embeddings2.shape[1])
     diff = np.subtract(embeddings1, embeddings2)
     dist = np.sum(np.square(diff), 1)
-    return calculate_val(thresholds, dist, actual_issame, far_target, nrof_folds=nrof_folds)
+    return calculate_val_by_diff(thresholds, dist, actual_issame, far_target, nrof_folds=nrof_folds)
 
 
 def calculate_val_by_diff(thresholds, dist, actual_issame, far_target, nrof_folds=10, ret_acc=False):
