@@ -5,6 +5,7 @@ import bcolz
 import torch
 import numpy as np
 from torch import optim
+from torch.nn import CrossEntropyLoss
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 from matplotlib import pyplot as plt
@@ -13,10 +14,11 @@ from torchvision import transforms as trans
 
 from utils import get_time, gen_plot, plot_scatter, hflip_batch, \
         separate_bn_paras, cosineDim1, MultipleOptimizer,\
-        getTFNPString, heatmap, annotate_heatmap
+        getTFNPString, heatmap, heatmap_seaborn, annotate_heatmap
 from data.data_pipe import de_preprocess, get_train_loader, get_val_data, loader_from_carray
 from model import Backbone, Arcface, MobileFaceNet, Am_softmax, l2_norm, Backbone_FC2Conv
 from networks import AttentionXCosNet
+from net_sphere import sphere20a, AngleLoss, AngleLinear
 from verification import evaluate, evaluate_attention
 from losses import l2normalize, CosAttentionLoss
 plt.switch_backend('agg')
@@ -29,33 +31,58 @@ class face_learner(object):
         if conf.use_mobilfacenet:
             self.model = MobileFaceNet(conf.embedding_size).to(conf.device)
             print('MobileFaceNet model generated')
-        else:
-            self.model = Backbone_FC2Conv(conf.net_depth, conf.drop_ratio, conf.net_mode).to(conf.device)
-            print('{}_{} model generated'.format(conf.net_mode, conf.net_depth))
+        elif conf.modelType == 'ArcFace':
+            self.model = Backbone_FC2Conv(conf.net_depth,
+                                          conf.drop_ratio,
+                                          conf.net_mode).to(conf.device)
+            print('{}_{} model generated'.format(conf.net_mode,
+                                                 conf.net_depth))
+        elif conf.modelType == 'CosFace':
+            self.model = Backbone_FC2Conv(conf.net_depth,
+                                          conf.drop_ratio,
+                                          conf.net_mode).to(conf.device)
+            print('{}_{} model generated'.format(conf.net_mode,
+                                                 conf.net_depth))
+        elif conf.modelType == 'SphereFace':
+            self.model = sphere20a(returnGrid=True).to(conf.device)
+            print('>>> SphereFace model is generated.')
 
         # Attention Model
         self.model_attention = AttentionXCosNet(conf).to(conf.device)
-        self.attention_loss = CosAttentionLoss()
+        self.xCos_loss_with_attention = CosAttentionLoss()
+        # Create model_gt for cos_gt generation
+        self.model_tgt = Backbone(conf.net_depth,
+                                  conf.drop_ratio, conf.net_mode)
+        self.model_tgt = self.model_tgt.to(conf.device)
+        self.model_tgt.load_state_dict(torch.load(conf.save_path/'model_{}'
+                                       .format(conf.pretrainedMdl)))
+        self.model_tgt = self.model_tgt.eval()
 
         if inference:
             self.threshold = conf.threshold
             self.threshold_xCos = conf.threshold_xCos
         else:  # Training mode
-            # Create model_gt for cos_gt generation
-            self.model_tgt = Backbone(conf.net_depth,
-                                      conf.drop_ratio, conf.net_mode)
-            self.model_tgt = self.model_tgt.to(conf.device)
-            self.model_tgt.load_state_dict(torch.load(conf.save_path/'model_{}'
-                                           .format(conf.pretrainedMdl)))
-            self.model_tgt = self.model_tgt.eval()
-
 
             self.milestones = conf.milestones
-            self.loader, self.class_num = get_train_loader(conf)
 
-            self.writer = SummaryWriter(os.path.join(conf.log_path, conf.exp_title + '/' + conf.exp_comment))
+            self.loader, self.class_num = get_train_loader(conf)
+            if conf.modelType == 'ArcFace':
+                self.head = Arcface(embedding_size=conf.embedding_size,
+                                    classnum=self.class_num).to(conf.device)
+                self.loss_fr = CrossEntropyLoss()
+            elif conf.modelType == 'CosFace':
+                self.head = Am_softmax(embedding_size=conf.embedding_size,
+                                       classnum=self.class_num).to(conf.device)
+                self.loss_fr = CrossEntropyLoss()
+            elif conf.modelType == 'SphereFace':
+                self.head = AngleLinear(conf.embedding_size,
+                                        self.class_num).to(conf.device)
+                self.loss_fr = AngleLoss()
+
+            self.writer = SummaryWriter(os.path.join(conf.log_path,
+                                        conf.exp_title + '/' +
+                                        conf.exp_comment))
             self.step = 0
-            self.head = Arcface(embedding_size=conf.embedding_size, classnum=self.class_num).to(conf.device)
 
             print('two model heads generated')
 
@@ -73,6 +100,7 @@ class face_learner(object):
                                     {'params': paras_only_bn}
                                 ], lr = conf.lr, momentum = conf.momentum)
                 print(self.optimizer_fr)
+            #TODO 0827
             self.optimizer_atten = optim.Adam(self.model_attention.parameters(), lr=conf.lr)
             # self.optimizer = MultipleOptimizer(self.optimizer_fr, self.optimizer_atten
 #             self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=40, verbose=True)
@@ -100,6 +128,22 @@ class face_learner(object):
             half_idx = feats.size(0) // 2
             feat1 = feats[:half_idx]
             feat2 = feats[half_idx:]
+            feat1 = l2normalize(feat1)
+            feat2 = l2normalize(feat2)
+            cosine = cosineDim1(feat1, feat2)
+            return cosine
+
+    def getCosFrom2Imgs(self, img1s, img2s):
+        '''
+        img1s: tensor of size (conf.bs//2, 3, 112, 112)
+        img2s: tensor of size (conf.bs//2, 3, 112, 112)
+        feat1: tensor of size [conf.bs//2, 512]
+        feat2: tensor of size [conf.bs//2, 512]
+        cosine:tensor of size (bs//2,)
+        '''
+        with torch.no_grad():
+            feat1 = self.model_tgt(img1s)
+            feat2 = self.model_tgt(img2s)
             feat1 = l2normalize(feat1)
             feat2 = l2normalize(feat2)
             cosine = cosineDim1(feat1, feat2)
@@ -137,7 +181,11 @@ class face_learner(object):
             save_path = conf.save_path
         else:
             save_path = conf.model_path
-        self.model.load_state_dict(torch.load(save_path/'model_{}'.format(fixed_str)), strict=strict)
+        if conf.modelType == 'SphereFace':
+            print('>>>> Loading Sphereface weights')
+            self.model.load_state_dict(torch.load(save_path/'sphere20a_20171020.pth'), strict=strict)
+        else:
+            self.model.load_state_dict(torch.load(save_path/'model_{}'.format(fixed_str)), strict=strict)
         if model_atten:
             self.model_attention.load_state_dict(torch.load(save_path/'model_attention_{}'.format(fixed_str)), strict=strict)
         if not model_only:
@@ -240,18 +288,25 @@ class face_learner(object):
                     # Size of attention: (bs//2, 1, 7, 7)
                     attention = self.model_attention(grid_feat1, grid_feat2)
                 # Size of xCos: (bs//2,)
-                xCos, cos_patched = self.attention_loss.computeXCos(
+                xCos, cos_patched = self.xCos_loss_with_attention.computeXCos(
                         grid_feat1, grid_feat2, attention,
                         returnCosPatched=True)
+                # Squeeze for channel dimension
                 attention = torch.squeeze(attention.permute(0, 2, 3, 1))
                 return xCos, attention, cos_patched
 
             def batch2XCosAndGtCos(batch, attention, conf, tta):
+                '''
+                batch: tensor of size (bs, 3, 112, 112) A[0::2] B[1::2]
+                '''
                 femb_bat, emb_batch = batch2feat(batch, conf, tta)
 
                 xCos, attentionMap, cos_patched = computeXCosWithAttention(
                         emb_batch, attention)
-                gtCos = cosineDim1(femb_bat[0::2], femb_bat[1::2])
+                # XXX
+                # gtCos = cosineDim1(femb_bat[0::2], femb_bat[1::2])
+                gtCos = self.getCosFrom2Imgs(batch[0::2].to(conf.device),
+                                             batch[1::2].to(conf.device))
                 # Store batch to xCos matrix
                 xCos = xCos.cpu().numpy()
                 gtCos = gtCos.cpu().numpy()
@@ -318,7 +373,7 @@ class face_learner(object):
         return accuracy.mean(), best_thresholds.mean(), roc_curve_tensor
 
     def plot_CorrBtwXCosAndCos(self, conf, carray, issame,
-                           nrof_folds=5, tta=False, attention=None):
+                               nrof_folds=5, tta=False, attention=None):
         '''
         carray: list (2 * # of pairs, 3, 112, 112)
         issame: list (# of pairs,)
@@ -334,6 +389,43 @@ class face_learner(object):
         corrPlot = Image.open(buf)
         corrPlot_tensor = trans.ToTensor()(corrPlot)
         return corrPlot_tensor
+
+    def plot_CorrBtwPatchCosAndGtCos(self, conf, carray, issame,
+                                     nrof_folds=5, tta=False, attention=None):
+        '''
+        carray: list (2 * # of pairs, 3, 112, 112)
+        issame: list (# of pairs,)
+        emb_batch: tensor [bs, 32, 7, 7]
+        xCoses: list (# of pairs,)
+        attention: GPUtorch.FloatTensor((bs//2, 1, 7, 7)),is ones/sum() or corr
+        '''
+        def getCorr(s_matrix, vec):
+            _, h, w = s_matrix.shape
+            result = np.zeros((h, w))
+            for i in range(h):
+                for j in range(w):
+                    result[i][j] = np.corrcoef(s_matrix[:, i, j], vec)[0, 1]
+            return result
+        xCoses, gtCoses, attentionMaps, cosPatchedMaps = self.getXCos(
+                carray, conf, tta=tta, attention=attention, returnXCAP=True)
+        # Calculate the correlation
+        corr_result = getCorr(cosPatchedMaps, gtCoses)
+        # plt.matshow(corr_result)
+        fig, ax = plt.subplots()
+
+        im, cbar = heatmap(corr_result, [], [], ax=ax,
+                                   cmap="YlGn", cbarlabel="correlation with GAP feat")
+        texts = annotate_heatmap(im, valfmt="{x:.3f}")
+
+        fig.tight_layout()
+        plt.show()
+        plt.gcf().clear()
+
+        title = 'xCos vs Cos on lfw 6000 pairs'
+        buf = plot_scatter(xCoses, gtCoses, title, 'xCos', 'Cos')
+        corrPlot = Image.open(buf)
+        corrPlot_tensor = trans.ToTensor()(corrPlot)
+        return corrPlot_tensor, corr_result
 
     def plot_Examples(self, conf, carray, issame,
                       nrof_folds=5, tta=False, attention=None,
@@ -402,37 +494,45 @@ class face_learner(object):
         axs[2].set_title(r'$cos_{patch}$', y=-0.1)
         axs[3].set_title(r'$weight_{attetion}$', y=-0.1)
 
-        def drawGridLines(image_t, w_lines=5, h_lines=6):
+        def drawGridLines(image_t, w_lines=5, h_lines=6,
+                          colorRGB=(128, 128, 128)):
+            '''
+            colorRGB: default: gray(128, 128, 128), you can use red(255, 0, 0)
+            '''
+            colorRGB = (255, 0, 0)
+            w_lines += 1
+            h_lines += 1
             h, w, _ = image_t.shape
             w_unit = int(w // w_lines)
-            w_start = int(w_unit // 2)
+            # w_start = int(w_unit // 2)
+            w_start = w_unit
             h_unit = int(h // h_lines)
-            h_start = int(h_unit // 2)
+            # h_start = int(h_unit // 2)
+            h_start = h_unit
             # Draw vertical grid lines
             for step in range(w_lines):
                 start_pt = (w_start + w_unit * step, 0)
                 end_pt = (w_start + w_unit * step, h)
-                cv2.line(image_t, start_pt, end_pt, (255, 0, 0), 1, 1)
+                cv2.line(image_t, start_pt, end_pt, colorRGB, 1, 1)
             # Draw horizontal grid lines
             for step in range(h_lines):
                 start_pt = (0, h_start + h_unit * step)
                 end_pt = (w, h_start + h_unit * step)
-                cv2.line(image_t, start_pt, end_pt, (255, 0, 0), 1, 1)
+                cv2.line(image_t, start_pt, end_pt, colorRGB, 1, 1)
         drawGridLines(image1, 6, 6)
         drawGridLines(image2, 6, 6)
         axs[0].imshow(image1)
         axs[1].imshow(image2)
         # Show cos_patch
-        im, cbar = heatmap(cos_patch, [], [], ax=axs[2],
-                           cmap="YlGn", cbarlabel=r'$cos_{patched}$')
-        texts = annotate_heatmap(im, valfmt="{x:.2f}")
+        im, cbar = heatmap_seaborn(cos_patch, [], [], ax=axs[2],
+                           cmap="RdBu", threshold=threshold)
         # Show weights_attention
         im, cbar = heatmap(weight_attention, [], [], ax=axs[3],
-                           cmap="YlGn", cbarlabel=r'$weight_{attetion}$')
-        texts = annotate_heatmap(im, valfmt="{x:.2f}")
+                           cmap="YlGn")
+        # texts = annotate_heatmap(im, valfmt="{x:.2f}")
         # axs[3].imshpw(cos_patch)
         # axs[4].imshow(weight_attention)
-        plt.show()
+        # plt.show()
         img_name = exPath + '/' + title_str + \
             "_COS_%5.4f_xCos_%5.4f" % (float(cos_fr), cos_x) + '.png'
         plt.savefig(img_name, bbox_inches='tight')
@@ -472,7 +572,7 @@ class face_learner(object):
 
     #         embeddings = self.model(imgs)
     #         thetas = self.head(embeddings, labels)
-    #         loss = conf.ce_loss(thetas, labels)
+    #         loss = conf.loss_fr(thetas, labels)
 
     #         # Compute the smoothed loss
     #         avg_loss = beta * avg_loss + (1 - beta) * loss.item()
@@ -551,8 +651,11 @@ class face_learner(object):
 
                 # Part1: FR
                 embeddings, grid_feats = self.model(imgs)
-                thetas = self.head(embeddings, labels)
-                loss1 = conf.ce_loss(thetas, labels)
+                if conf.modelType == 'SphereFace':
+                    thetas = self.head(embeddings)
+                else:
+                    thetas = self.head(embeddings, labels)
+                loss1 = self.loss_fr(thetas, labels)
 
                 # Part2: xCos
                 cos_gts = self.getCos(imgs)
@@ -561,7 +664,14 @@ class face_learner(object):
                 grid_feat2s = grid_feats[half_idx:]
                 attention = self.model_attention(grid_feat1s, grid_feat2s)
 
-                loss2 = self.attention_loss(grid_feat1s, grid_feat2s, attention, cos_gts)
+                if conf.detachAttentionGradient:
+                    grid_feat1s = grid_feat1s.detach()
+                    grid_feat2s = grid_feat2s.detach()
+
+                loss2 = self.xCos_loss_with_attention(grid_feat1s,
+                                                      grid_feat2s,
+                                                      attention,
+                                                      cos_gts)
                 # TODO alpha weight
                 alpha = 0.5
                 loss = alpha * loss1 + (1 - alpha) * loss2
@@ -589,7 +699,7 @@ class face_learner(object):
                     self.model.train()
                     self.model_attention.train()
                 if self.step % self.save_every == 0 and self.step != 0:
-                    self.save_state(conf, accuracy)
+                    self.save_state(conf, accuracy, extra=conf.modelType)
 
                 self.step += 1
 

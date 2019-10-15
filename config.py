@@ -6,6 +6,7 @@ from torchvision import transforms as trans
 
 def get_config(training = True):
     conf = edict()
+    conf.detachAttentionGradient = True
     conf.fixed_str = 'ir_se50.pth'
     conf.pretrainedMdl = 'ir_se50.pth'
     # conf.fixed_str = '2019-08-24-10-31_accuracy:0.9194285714285716_step:76660_None.pth'
@@ -15,10 +16,11 @@ def get_config(training = True):
     conf.log_path = conf.work_path/'log/'
     conf.save_path = conf.work_path/'save'
     conf.exp_title = 'xCos'
-    conf.exp_comment = 'expMS1M'
+    conf.exp_comment = 'expMS1M_detached'
     conf.input_size = [112,112]
     conf.embedding_size = 1568 #3136 #512
     conf.use_mobilfacenet = False
+    conf.modelType = 'ArcFace'
     conf.net_depth = 50
     conf.drop_ratio = 0.6
     conf.net_mode = 'ir_se' # or 'ir'
@@ -46,7 +48,7 @@ def get_config(training = True):
         conf.pin_memory = True
 #         conf.num_workers = 4 # when batchsize is 200
         conf.num_workers = 1
-        conf.ce_loss = CrossEntropyLoss()
+        # conf.ce_loss = CrossEntropyLoss()
 #--------------------Inference Config ------------------------
     else:
         conf.facebank_path = conf.data_path/'facebank'
