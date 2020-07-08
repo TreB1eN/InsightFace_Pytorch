@@ -88,7 +88,8 @@ def load_mx_rec(rec_path):
     for idx in tqdm(range(1,max_idx)):
         img_info = imgrec.read_idx(idx)
         header, img = mx.recordio.unpack_img(img_info)
-        label = int(header.label)
+        # label = int(header.label)
+        label = int(header.label[0])
         img = Image.fromarray(img)
         label_path = save_path/str(label)
         if not label_path.exists():
