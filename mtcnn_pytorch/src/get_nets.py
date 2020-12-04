@@ -4,6 +4,11 @@ import torch.nn.functional as F
 from collections import OrderedDict
 import numpy as np
 
+def get_np_version_number():
+    ver_str = np.__version__
+    ver_list = ver_str.split('.')
+    ver_num = int(ver_list[0]) * 10000 + int(ver_list[1])*100 + int(ver_list[2])
+    return ver_num
 
 class Flatten(nn.Module):
 
@@ -51,8 +56,19 @@ class PNet(nn.Module):
 
         self.conv4_1 = nn.Conv2d(32, 2, 1, 1)
         self.conv4_2 = nn.Conv2d(32, 4, 1, 1)
+        np_ver =  get_np_version_number()
+        if np_ver >= 11602: # from np 1.16.2, allow_pickle default set to False
+            # save np.load
+            np_load_old = np.load
+            # modify the default parameters of np.load
+            np.load = lambda *a,**k: np_load_old(*a, allow_pickle=True, **k)
 
         weights = np.load('mtcnn_pytorch/src/weights/pnet.npy')[()]
+
+        if np_ver >= 11602: # from np 1.16.2, allow_pickle default set to False
+            # restore np.load for future normal usage
+            np.load = np_load_old
+
         for n, p in self.named_parameters():
             p.data = torch.FloatTensor(weights[n])
 
@@ -96,8 +112,19 @@ class RNet(nn.Module):
 
         self.conv5_1 = nn.Linear(128, 2)
         self.conv5_2 = nn.Linear(128, 4)
+        np_ver =  get_np_version_number()
+        if np_ver >= 11602: # from np 1.16.2, allow_pickle default set to False
+            # save np.load
+            np_load_old = np.load
+            # modify the default parameters of np.load
+            np.load = lambda *a,**k: np_load_old(*a, allow_pickle=True, **k)
 
         weights = np.load('mtcnn_pytorch/src/weights/rnet.npy')[()]
+
+        if np_ver >= 11602: # from np 1.16.2, allow_pickle default set to False
+            # restore np.load for future normal usage
+            np.load = np_load_old
+
         for n, p in self.named_parameters():
             p.data = torch.FloatTensor(weights[n])
 
@@ -148,7 +175,21 @@ class ONet(nn.Module):
         self.conv6_2 = nn.Linear(256, 4)
         self.conv6_3 = nn.Linear(256, 10)
 
+        np_ver =  get_np_version_number()
+        if np_ver >= 11602: # from np 1.16.2, allow_pickle default set to False
+            # save np.load
+            np_load_old = np.load
+            # modify the default parameters of np.load
+            np.load = lambda *a,**k: np_load_old(*a, allow_pickle=True, **k)
+
         weights = np.load('mtcnn_pytorch/src/weights/onet.npy')[()]
+
+
+        if np_ver >= 11602: # from np 1.16.2, allow_pickle default set to False
+            # restore np.load for future normal usage
+            np.load = np_load_old
+
+
         for n, p in self.named_parameters():
             p.data = torch.FloatTensor(weights[n])
 
