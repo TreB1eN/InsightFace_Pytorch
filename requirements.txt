@@ -7,7 +7,7 @@ scipy==1.0.0
 bcolz==1.2.1
 easydict==1.7
 opencv_python==3.4.0.12
-Pillow==5.2.0
+Pillow==8.1.1
 mxnet==1.2.1.post1
 scikit_learn==0.19.2
 tensorboardX==1.2
