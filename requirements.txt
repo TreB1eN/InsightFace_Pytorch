@@ -6,7 +6,7 @@ mxnet_cu90==1.2.1
 scipy==1.0.0
 bcolz==1.2.1
 easydict==1.7
-opencv_python==3.4.0.12
+opencv_python==3.4.7.28
 Pillow==5.2.0
 mxnet==1.2.1.post1
 scikit_learn==0.19.2
